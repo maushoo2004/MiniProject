@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   moderateContentEnhanced,
   getAISuggestion,
 } from "../services/enhancedModerationService";
+import { getUserReportCount } from "../lib/supabase";
 import "./CommentForm.css";
 
 const CommentForm = ({ postId, onAddComment, showToast, user }) => {
@@ -12,7 +13,20 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [isCheckingModeration, setIsCheckingModeration] = useState(false);
   const [moderationResult, setModerationResult] = useState(null);
+  const [reportCount, setReportCount] = useState(0);
+  const [isLoadingReports, setIsLoadingReports] = useState(true);
 
+  useEffect(() => {
+    const fetchReportCount = async () => {
+      if (user && user.id) {
+        setIsLoadingReports(true);
+        const count = await getUserReportCount(user.id);
+        setReportCount(count);
+        setIsLoadingReports(false);
+      }
+    };
+    fetchReportCount();
+  }, [user]);
   // Reset suggestion when content changes
   const handleContentChange = (e) => {
     const newContent = e.target.value;
@@ -173,6 +187,9 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
     }
   };
 
+  // Disable comment box if user has more than 3 reports
+  const isUserBlocked = reportCount > 3;
+
   return (
     <form className="comment-form" onSubmit={handleSubmit}>
       <div className="form-group">
@@ -181,10 +198,15 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
           id="content"
           value={content}
           onChange={handleContentChange}
-          placeholder="Share your thoughts... (Supports Hindi and English)"
+          placeholder={isUserBlocked ? "You are blocked from commenting due to multiple reports." : "Share your thoughts... (Supports Hindi and English)"}
           rows="4"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isUserBlocked || isLoadingReports}
         />
+        {isUserBlocked && (
+          <p className="blocked-message" style={{ color: 'red', marginTop: '8px' }}>
+            You cannot comment because your account has more than 3 reports.
+          </p>
+        )}
       </div>
 
       {/* AI Suggestion Box - Appears below comment box */}
