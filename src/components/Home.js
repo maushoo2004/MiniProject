@@ -143,20 +143,27 @@ const Home = ({ blogs, loading, showToast, user, onAuthClick }) => {
       <div className="blog-list">
         {blogs.map((blog) => (
           <Link to={`/post/${blog.id}`} key={blog.id} className="blog-card">
-            <div className="blog-card-header">
-              <h3>{blog.title}</h3>
-              <div className="blog-meta">
-                <span className="blog-author">By {blog.author}</span>
-                <span className="blog-date">
-                  {blog.created_at
-                    ? new Date(blog.created_at).toLocaleDateString()
-                    : new Date(blog.date).toLocaleDateString()}
-                </span>
+            {blog.image_url && (
+              <div className="blog-card-image">
+                <img src={blog.image_url} alt={blog.title} />
               </div>
-            </div>
-            <p className="blog-excerpt">{blog.excerpt}</p>
-            <div className="blog-card-footer">
-              <span className="read-more">Read more →</span>
+            )}
+            <div className="blog-card-content">
+              <div className="blog-card-header">
+                <h3>{blog.title}</h3>
+                <div className="blog-meta">
+                  <span className="blog-author">By {blog.author}</span>
+                  <span className="blog-date">
+                    {blog.created_at
+                      ? new Date(blog.created_at).toLocaleDateString()
+                      : new Date(blog.date).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <p className="blog-excerpt">{blog.excerpt}</p>
+              <div className="blog-card-footer">
+                <span className="read-more">Read more →</span>
+              </div>
             </div>
           </Link>
         ))}

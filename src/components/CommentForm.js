@@ -10,95 +10,50 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [showSuggestion, setShowSuggestion] = useState(false);
-  const [isCheckingSuggestion, setIsCheckingSuggestion] = useState(false);
+  const [isCheckingModeration, setIsCheckingModeration] = useState(false);
+  const [moderationResult, setModerationResult] = useState(null);
 
-  // Reset suggestion when content changes significantly
-  const handleContentChange = async (e) => {
+  // Reset suggestion when content changes
+  const handleContentChange = (e) => {
     const newContent = e.target.value;
     setContent(newContent);
 
-    // Hide suggestion if content changes significantly
-    if (newContent.length < content.length - 10 || newContent !== content) {
+    // Reset moderation state when content changes
+    if (showSuggestion) {
       setShowSuggestion(false);
       setAiSuggestion(null);
-    }
-  };
-
-  // Check for AI suggestion when user clicks post button (non-blocking)
-  const handlePostClick = () => {
-    // Check for suggestion in the background (don't block form submission)
-    // Only check if we haven't already shown a suggestion for this content
-    if (content.trim().length > 3 && !isCheckingSuggestion && !showSuggestion) {
-      setIsCheckingSuggestion(true);
-      console.log(
-        "🔍 Checking for AI suggestion for:",
-        content.substring(0, 50)
-      );
-
-      // Check if content is potentially flaggable and get suggestion
-      // This runs asynchronously and doesn't block form submission
-      getAISuggestion(content)
-        .then((suggestion) => {
-          console.log("💡 AI Suggestion received:", suggestion);
-          if (suggestion && suggestion.trim().length > 0) {
-            setAiSuggestion(suggestion);
-            setShowSuggestion(true);
-            console.log("✅ Showing suggestion to user");
-          } else {
-            console.log(
-              "⚠️ No suggestion returned (content may not be toxic enough)"
-            );
-          }
-        })
-        .catch((error) => {
-          console.warn("❌ Could not get AI suggestion:", error);
-        })
-        .finally(() => {
-          setIsCheckingSuggestion(false);
-        });
+      setModerationResult(null);
     }
   };
 
   // Use the suggested rephrasing
-  const handleUseSuggestion = () => {
+  const handleUseSuggestion = async () => {
     if (aiSuggestion) {
       setContent(aiSuggestion);
       setShowSuggestion(false);
       setAiSuggestion(null);
-      // Auto-submit after using suggestion
-      setTimeout(() => {
-        const form = document.querySelector(".comment-form");
-        if (form) {
-          const submitEvent = new Event("submit", {
-            bubbles: true,
-            cancelable: true,
-          });
-          form.dispatchEvent(submitEvent);
-        }
-      }, 100);
+      setModerationResult(null);
+      showToast("Suggestion applied. Please review and submit.", "info");
     }
   };
 
-  // Post the original comment anyway (ignore suggestion)
-  const handlePostAnyway = async () => {
+  // Dismiss suggestion and keep original comment
+  const handleDismissSuggestion = () => {
     setShowSuggestion(false);
     setAiSuggestion(null);
+    setModerationResult(null);
+  };
 
-    // Manually trigger form submission
-    if (!content.trim()) {
-      showToast("Please enter a comment", "error");
-      return;
-    }
-
-    if (!user) {
-      showToast("Please login to comment", "error");
+  // Post the original comment anyway (after seeing warning)
+  const handlePostAnyway = async () => {
+    if (!moderationResult || !content.trim() || !user) {
       return;
     }
 
     setIsSubmitting(true);
+    setShowSuggestion(false);
 
     try {
-      const moderationResult = await moderateContentEnhanced(content);
       const commentData = {
         content: content,
         isFlagged: moderationResult.isToxic,
@@ -108,21 +63,24 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
         source: moderationResult.source || "keyword",
       };
 
-      onAddComment(commentData);
+      await onAddComment(commentData);
 
       if (moderationResult.isToxic) {
         showToast(
-          `Your comment has been flagged as inappropriate (Score: ${(
+          `Your comment has been flagged and posted (Score: ${(
             moderationResult.score * 100
-          ).toFixed(1)}%) and will not be displayed publicly.`,
+          ).toFixed(1)}%). It will be reviewed.`,
           "warning"
         );
       } else {
         showToast("Comment posted successfully!", "success");
       }
 
+      // Reset form
       setContent("");
-      setIsCheckingSuggestion(false);
+      setAiSuggestion(null);
+      setShowSuggestion(false);
+      setModerationResult(null);
     } catch (error) {
       console.error("Error submitting comment:", error);
       showToast("Error posting comment. Please try again.", "error");
@@ -144,69 +102,74 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
       return;
     }
 
-    // If suggestion is showing and this is first click, just show suggestion
-    // If they click Post again, proceed with submission
-    if (showSuggestion && aiSuggestion && !isSubmitting) {
-      // User clicked Post again - they want to post anyway
-      // Hide suggestion and proceed
-      setShowSuggestion(false);
-      setAiSuggestion(null);
+    // If already showing suggestion/warning, don't check again
+    if (showSuggestion) {
+      return;
     }
 
-    setIsSubmitting(true);
+    setIsCheckingModeration(true);
 
     try {
-      console.log(
-        "🔍 Starting enhanced moderation check for comment:",
-        content
-      );
+      console.log("🔍 Checking content for moderation:", content);
 
-      // Check content moderation with enhanced service
-      const moderationResult = await moderateContentEnhanced(content);
+      // First, check moderation
+      const modResult = await moderateContentEnhanced(content);
+      setModerationResult(modResult);
 
-      console.log("📊 Enhanced moderation result received:", {
-        isToxic: moderationResult.isToxic,
-        score: moderationResult.score,
-        severity: moderationResult.severity,
-        categories: moderationResult.categories,
-        source: moderationResult.source,
-      });
+      console.log("📊 Moderation result:", modResult);
 
-      // Pass enhanced moderation data to parent for database save
-      const commentData = {
-        content: content,
-        isFlagged: moderationResult.isToxic,
-        toxicityScore: moderationResult.score || null,
-        severity: moderationResult.severity || null,
-        categories: moderationResult.categories || [],
-        source: moderationResult.source || "keyword",
-      };
+      // If content is toxic, get AI suggestion and show warning
+      if (modResult.isToxic) {
+        console.log("⚠️ Content is toxic, getting AI suggestion...");
 
-      console.log("💾 Saving comment with data:", commentData);
+        try {
+          const suggestion = await getAISuggestion(content);
+          if (suggestion && suggestion.trim().length > 0) {
+            setAiSuggestion(suggestion);
+            setShowSuggestion(true);
+            console.log("💡 Showing suggestion to user");
+            showToast(
+              "Please review the suggestion or choose to post anyway",
+              "warning"
+            );
+            return; // Stop here - don't submit yet
+          }
+        } catch (error) {
+          console.warn("Could not get AI suggestion:", error);
+        }
 
-      onAddComment(commentData);
-
-      if (moderationResult.isToxic) {
+        // If no suggestion available, still show warning
+        setShowSuggestion(true);
         showToast(
-          `Your comment has been flagged as inappropriate (Score: ${(
-            moderationResult.score * 100
-          ).toFixed(1)}%) and will not be displayed publicly.`,
+          "Your comment may be inappropriate. Review or post anyway.",
           "warning"
         );
-      } else {
-        showToast("Comment posted successfully!", "success");
+        return; // Stop here - don't submit yet
       }
 
-      // Reset form and suggestion state
+      // Content is clean, proceed with submission
+      console.log("✅ Content is clean, submitting...");
+
+      const commentData = {
+        content: content,
+        isFlagged: false,
+        toxicityScore: modResult.score || null,
+        severity: null,
+        categories: [],
+        source: modResult.source || "keyword",
+      };
+
+      await onAddComment(commentData);
+      showToast("Comment posted successfully!", "success");
+
+      // Reset form
       setContent("");
-      setAiSuggestion(null);
-      setShowSuggestion(false);
-      setIsCheckingSuggestion(false);
+      setModerationResult(null);
     } catch (error) {
       console.error("Error submitting comment:", error);
       showToast("Error posting comment. Please try again.", "error");
     } finally {
-      setIsSubmitting(false);
+      setIsCheckingModeration(false);
     }
   };
 
@@ -225,50 +188,85 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
       </div>
 
       {/* AI Suggestion Box - Appears below comment box */}
-      {showSuggestion && aiSuggestion && (
+      {showSuggestion && (
         <div className="ai-suggestion-box">
           <div className="suggestion-header">
-            <span className="suggestion-icon">💡</span>
-            <strong>Polite Alternative Suggestion:</strong>
+            <span className="suggestion-icon">⚠️</span>
+            <strong>Content Warning</strong>
             <button
               className="suggestion-close"
-              onClick={() => setShowSuggestion(false)}
+              onClick={handleDismissSuggestion}
               aria-label="Close suggestion"
+              type="button"
             >
               ×
             </button>
           </div>
-          <p className="suggestion-text">{aiSuggestion}</p>
-          <div className="suggestion-actions">
-            <button
-              type="button"
-              className="use-suggestion-btn"
-              onClick={handleUseSuggestion}
-              disabled={isSubmitting}
-            >
-              Use This Suggestion
-            </button>
-            <button
-              type="button"
-              className="post-anyway-btn"
-              onClick={handlePostAnyway}
-              disabled={isSubmitting}
-            >
-              Post Anyway
-            </button>
-            <button
-              type="button"
-              className="dismiss-suggestion-btn"
-              onClick={() => setShowSuggestion(false)}
-              disabled={isSubmitting}
-            >
-              Dismiss
-            </button>
-          </div>
-          <p className="suggestion-note">
-            💬 Your comment may be flagged. Consider using the suggestion above,
-            or post your original comment.
-          </p>
+          {aiSuggestion ? (
+            <>
+              <p className="suggestion-text">{aiSuggestion}</p>
+              <div className="suggestion-actions">
+                <button
+                  type="button"
+                  className="use-suggestion-btn"
+                  onClick={handleUseSuggestion}
+                  disabled={isSubmitting}
+                >
+                  Use This Suggestion
+                </button>
+                <button
+                  type="button"
+                  className="post-anyway-btn"
+                  onClick={handlePostAnyway}
+                  disabled={isSubmitting}
+                >
+                  Post Original Anyway
+                </button>
+                <button
+                  type="button"
+                  className="dismiss-suggestion-btn"
+                  onClick={handleDismissSuggestion}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="suggestion-note">
+                💬 Your comment was flagged as potentially inappropriate. You
+                can use the polite suggestion above or post your original
+                comment.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="suggestion-text">
+                Your comment may contain inappropriate content. Please review
+                your comment before posting.
+              </p>
+              <div className="suggestion-actions">
+                <button
+                  type="button"
+                  className="post-anyway-btn"
+                  onClick={handlePostAnyway}
+                  disabled={isSubmitting}
+                >
+                  Post Anyway
+                </button>
+                <button
+                  type="button"
+                  className="dismiss-suggestion-btn"
+                  onClick={handleDismissSuggestion}
+                  disabled={isSubmitting}
+                >
+                  Cancel & Edit
+                </button>
+              </div>
+              <p className="suggestion-note">
+                ⚠️ Your comment will be flagged and may not be visible to
+                everyone.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -276,24 +274,16 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
         <button
           type="submit"
           className="submit-button"
-          disabled={isSubmitting}
-          onClick={handlePostClick}
+          disabled={isSubmitting || isCheckingModeration}
         >
           {isSubmitting
             ? "Posting..."
-            : showSuggestion && aiSuggestion
-            ? "Post Comment Anyway"
+            : isCheckingModeration
+            ? "Checking..."
             : "Post Comment"}
         </button>
-        {isCheckingSuggestion && !showSuggestion && (
-          <span className="checking-indicator">
-            💭 Checking for suggestions...
-          </span>
-        )}
-        {showSuggestion && aiSuggestion && (
-          <span className="suggestion-hint">
-            💡 Click "Post Comment Anyway" or use the buttons above
-          </span>
+        {isCheckingModeration && (
+          <span className="checking-indicator">🔍 Checking content...</span>
         )}
       </div>
     </form>

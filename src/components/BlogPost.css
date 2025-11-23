@@ -82,6 +82,31 @@
   color: #64748b;
 }
 
+.post-cover-image {
+  margin: 2rem -3rem;
+  border-radius: 12px;
+  overflow: hidden;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.post-cover-image img {
+  width: 100%;
+  height: auto;
+  max-height: 500px;
+  object-fit: cover;
+  display: block;
+}
+
 .post-body {
   font-size: 1.1rem;
   line-height: 1.8;
@@ -118,5 +143,13 @@
 
   .post-body {
     font-size: 1rem;
+  }
+
+  .post-cover-image {
+    margin: 2rem -1.5rem;
+  }
+
+  .post-cover-image img {
+    max-height: 300px;
   }
 }

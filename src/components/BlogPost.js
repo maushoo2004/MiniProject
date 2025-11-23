@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import Comments from './Comments';
-import './BlogPost.css';
+import React, { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import Comments from "./Comments";
+import "./BlogPost.css";
 
 const BlogPost = ({ showToast, user }) => {
   const { id } = useParams();
@@ -17,16 +17,18 @@ const BlogPost = ({ showToast, user }) => {
   const fetchPost = async () => {
     try {
       const { data, error } = await supabase
-        .from('posts')
-        .select(`
+        .from("posts")
+        .select(
+          `
           *,
           profiles:author_id (
             id,
             name,
             email
           )
-        `)
-        .eq('id', parseInt(id))
+        `
+        )
+        .eq("id", parseInt(id))
         .single();
 
       if (error) throw error;
@@ -36,11 +38,12 @@ const BlogPost = ({ showToast, user }) => {
           id: data.id,
           title: data.title,
           content: data.content,
-          excerpt: data.excerpt || data.content.substring(0, 150) + '...',
-          author: data.profiles?.name || 'Unknown',
+          excerpt: data.excerpt || data.content.substring(0, 150) + "...",
+          image_url: data.image_url,
+          author: data.profiles?.name || "Unknown",
           authorId: data.author_id,
-          date: data.created_at.split('T')[0],
-          created_at: data.created_at
+          date: data.created_at.split("T")[0],
+          created_at: data.created_at,
         };
 
         setBlog(transformedPost);
@@ -48,8 +51,8 @@ const BlogPost = ({ showToast, user }) => {
         setIsAuthor(user?.id === data.author_id);
       }
     } catch (error) {
-      console.error('Error fetching post:', error);
-      showToast('Error loading post', 'error');
+      console.error("Error fetching post:", error);
+      showToast("Error loading post", "error");
     } finally {
       setLoading(false);
     }
@@ -70,7 +73,9 @@ const BlogPost = ({ showToast, user }) => {
       <div className="blog-post">
         <div className="not-found">
           <h2>Blog post not found</h2>
-          <Link to="/" className="back-link">← Back to Home</Link>
+          <Link to="/" className="back-link">
+            ← Back to Home
+          </Link>
         </div>
       </div>
     );
@@ -78,28 +83,38 @@ const BlogPost = ({ showToast, user }) => {
 
   return (
     <div className="blog-post">
-      <Link to="/" className="back-link">← Back to Home</Link>
-      
+      <Link to="/" className="back-link">
+        ← Back to Home
+      </Link>
+
       <article className="post-content">
         <header className="post-header">
           <h1>{blog.title}</h1>
           <div className="post-meta">
             <span className="post-author">By {blog.author}</span>
-            <span className="post-date">{new Date(blog.created_at).toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</span>
+            <span className="post-date">
+              {new Date(blog.created_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
           </div>
         </header>
-        
+
+        {blog.image_url && (
+          <div className="post-cover-image">
+            <img src={blog.image_url} alt={blog.title} />
+          </div>
+        )}
+
         <div className="post-body">
           <p>{blog.content}</p>
         </div>
       </article>
 
-      <Comments 
-        postId={parseInt(id)} 
+      <Comments
+        postId={parseInt(id)}
         isAuthor={isAuthor}
         showToast={showToast}
         user={user}
@@ -109,4 +124,3 @@ const BlogPost = ({ showToast, user }) => {
 };
 
 export default BlogPost;
-
