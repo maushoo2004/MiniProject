@@ -89,14 +89,14 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
           isReported: reportedCommentIds.includes(comment.id),
         }))
         .filter((comment) => {
-          // Authors see all comments EXCEPT reported ones in flagged list
-          if (isAuthor) {
-            // If comment is reported, don't show it in the list (it's been handled)
-            // But still mark it as reported for UI purposes
-            return true; // Authors can see all, but we'll filter reported flagged ones in CommentList
-          }
-          // Non-authors don't see flagged comments
+          // Hide flagged comments from everyone (they're only visible in Analytics)
           if (comment.isFlagged) return false;
+
+          // Authors see all non-flagged comments
+          if (isAuthor) {
+            return true;
+          }
+
           // Non-authors don't see reported comments
           if (comment.isReported) return false;
           return true;
@@ -160,9 +160,13 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
 
       // Refresh comments
       fetchComments();
+
+      // Return the created comment data
+      return data;
     } catch (error) {
       console.error("Error adding comment:", error);
       showToast("Error posting comment. Please try again.", "error");
+      return null;
     } finally {
       setLoading(false);
     }

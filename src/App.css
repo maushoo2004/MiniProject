@@ -87,7 +87,8 @@
 }
 
 .login-button,
-.logout-button {
+.logout-button,
+.analytics-button {
   background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
   color: white;
   border: 1px solid rgba(139, 92, 246, 0.5);
@@ -101,8 +102,14 @@
   overflow: hidden;
 }
 
+.analytics-button {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  border-color: rgba(236, 72, 153, 0.5);
+}
+
 .login-button::before,
-.logout-button::before {
+.logout-button::before,
+.analytics-button::before {
   content: '';
   position: absolute;
   top: 0;
@@ -114,7 +121,8 @@
 }
 
 .login-button:hover::before,
-.logout-button:hover::before {
+.logout-button:hover::before,
+.analytics-button:hover::before {
   left: 100%;
 }
 
@@ -125,8 +133,15 @@
   border-color: rgba(139, 92, 246, 0.8);
 }
 
+.analytics-button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(236, 72, 153, 0.6);
+  border-color: rgba(236, 72, 153, 0.8);
+}
+
 .login-button:active,
-.logout-button:active {
+.logout-button:active,
+.analytics-button:active {
   transform: translateY(0) scale(1);
   box-shadow: 0 4px 10px rgba(139, 92, 246, 0.4);
 }

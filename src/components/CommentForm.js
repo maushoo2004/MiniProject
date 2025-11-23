@@ -4,6 +4,7 @@ import {
   getAISuggestion,
 } from "../services/enhancedModerationService";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 import "./CommentForm.css";
 
 const CommentForm = ({ postId, onAddComment, showToast, user }) => {
@@ -47,6 +48,7 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
   };
 
   // Post the original comment anyway (after seeing warning)
+  // This now automatically reports the user and blocks the comment from the author
   const handlePostAnyway = async () => {
     if (!moderationResult || !content.trim() || !user) {
       return;
@@ -56,36 +58,90 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
     setShowSuggestion(false);
 
     try {
+      // Automatically report the user for posting toxic content
+      console.log(
+        "⚠️ User is posting toxic content anyway - auto-reporting..."
+      );
+
+      // First, create the comment in the database (marked as flagged)
       const commentData = {
         content: content,
-        isFlagged: moderationResult.isToxic,
+        isFlagged: true,
         toxicityScore: moderationResult.score || null,
-        severity: moderationResult.severity || null,
+        severity: moderationResult.severity || "high",
         categories: moderationResult.categories || [],
         source: moderationResult.source || "keyword",
       };
 
-      await onAddComment(commentData);
+      // Post the comment (flagged, so hidden from public but visible to post author)
+      const postedComment = await onAddComment(commentData);
+      console.log("💬 Toxic comment posted (flagged):", postedComment);
 
-      if (moderationResult.isToxic) {
-        showToast(
-          `Your comment has been flagged and posted (Score: ${(
-            moderationResult.score * 100
-          ).toFixed(1)}%). It will be reviewed.`,
-          "warning"
-        );
-      } else {
-        showToast("Comment posted successfully!", "success");
+      // Create report in the reports table with the comment ID
+      const { error: reportError } = await supabase.from("reports").insert([
+        {
+          reported_user_id: user.id,
+          reporter_id: user.id, // Self-report by system
+          comment_id: postedComment?.id || null,
+          post_id: postId,
+          reason: "Posted toxic content after moderation warning",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (reportError && reportError.code !== "23505") {
+        console.error("Error creating auto-report:", reportError);
       }
+
+      // Increment report count
+      try {
+        const { error: rpcError } = await supabase.rpc(
+          "increment_user_report_count",
+          { target_user_id: user.id }
+        );
+
+        if (rpcError) {
+          // Fallback to direct update
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("report_count")
+            .eq("id", user.id)
+            .single();
+
+          const currentCount = profile?.report_count || 0;
+          await supabase
+            .from("profiles")
+            .update({ report_count: currentCount + 1 })
+            .eq("id", user.id);
+        }
+      } catch (error) {
+        console.error("Error incrementing report count:", error);
+      }
+
+      // Show severe warning with longer duration (15 seconds)
+      showToast(
+        `⚠️ WARNING: Your comment has been BLOCKED and your account has been reported for posting inappropriate content after being warned. Continued violations will result in permanent suspension. Current toxicity score: ${(
+          moderationResult.score * 100
+        ).toFixed(1)}%`,
+        "error",
+        15000 // 15 seconds duration
+      );
 
       // Reset form
       setContent("");
       setAiSuggestion(null);
       setShowSuggestion(false);
       setModerationResult(null);
+
+      // Refresh auth context to update report count after toast is shown
+      if (window.location) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 16000); // Reload after 16 seconds (after the 15-second toast)
+      }
     } catch (error) {
-      console.error("Error submitting comment:", error);
-      showToast("Error posting comment. Please try again.", "error");
+      console.error("Error handling toxic comment:", error);
+      showToast("Error processing your request. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -247,9 +303,11 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
                 </button>
               </div>
               <p className="suggestion-note">
-                💬 Your comment was flagged as potentially inappropriate. You
-                can use the polite suggestion above or post your original
-                comment.
+                ⚠️ <strong>WARNING:</strong> Your comment was flagged as
+                inappropriate. If you post it anyway, your account will be{" "}
+                <strong>automatically reported</strong> and the comment will be{" "}
+                <strong>BLOCKED from the author</strong>. Use the polite
+                suggestion to avoid penalties.
               </p>
             </>
           ) : (
@@ -277,8 +335,10 @@ const CommentForm = ({ postId, onAddComment, showToast, user }) => {
                 </button>
               </div>
               <p className="suggestion-note">
-                ⚠️ Your comment will be flagged and may not be visible to
-                everyone.
+                ⚠️ <strong>SEVERE WARNING:</strong> Posting this comment will
+                result in <strong>automatic account reporting</strong> and the
+                comment will be <strong>BLOCKED</strong>. Your account may be
+                suspended after multiple violations. Please edit your comment.
               </p>
             </>
           )}

@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { supabase } from "./lib/supabase";
 import Home from "./components/Home";
 import BlogPost from "./components/BlogPost";
 import CreateBlogPost from "./components/CreateBlogPost";
+import Analytics from "./components/Analytics";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Auth from "./components/Auth";
 import Toast from "./components/Toast";
@@ -12,6 +18,7 @@ import "./App.css";
 import Logo from "./assets/logo.png";
 
 function AppContent() {
+  const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const { user, signOut, getUserProfile } = useAuth();
@@ -19,10 +26,13 @@ function AppContent() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const showToast = React.useCallback((message, type = "info") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
+  const showToast = React.useCallback(
+    (message, type = "info", duration = 4000) => {
+      setToast({ message, type, duration });
+      // Don't set timeout here - let the Toast component handle it via onClose
+    },
+    []
+  );
 
   const fetchPosts = React.useCallback(async () => {
     try {
@@ -132,6 +142,13 @@ function AppContent() {
                   <span className="user-name">
                     {userProfile?.name || user.email}
                   </span>
+                  <button
+                    className="analytics-button"
+                    onClick={() => navigate("/analytics")}
+                    title="View your analytics dashboard"
+                  >
+                    📊 Analytics
+                  </button>
                   <button className="logout-button" onClick={handleSignOut}>
                     Logout
                   </button>
@@ -179,6 +196,14 @@ function AppContent() {
             path="/post/:id"
             element={<BlogPost showToast={showToast} user={user} />}
           />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics user={user} showToast={showToast} />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
       {showAuth && <Auth onClose={() => setShowAuth(false)} />}
@@ -186,6 +211,7 @@ function AppContent() {
         <Toast
           message={toast.message}
           type={toast.type}
+          duration={toast.duration}
           onClose={() => setToast(null)}
         />
       )}

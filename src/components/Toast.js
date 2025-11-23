@@ -1,25 +1,25 @@
-import React, { useEffect } from 'react';
-import './Toast.css';
+import React, { useEffect } from "react";
+import "./Toast.css";
 
-const Toast = ({ message, type = 'info', onClose }) => {
+const Toast = ({ message, type = "info", onClose, duration = 4000 }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
-    }, 4000);
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, duration]);
 
   const getIcon = () => {
     switch (type) {
-      case 'success':
-        return '✅';
-      case 'error':
-        return '❌';
-      case 'warning':
-        return '⚠️';
+      case "success":
+        return "✅";
+      case "error":
+        return "❌";
+      case "warning":
+        return "⚠️";
       default:
-        return 'ℹ️';
+        return "ℹ️";
     }
   };
 
@@ -27,10 +27,11 @@ const Toast = ({ message, type = 'info', onClose }) => {
     <div className={`toast toast-${type}`}>
       <span className="toast-icon">{getIcon()}</span>
       <span className="toast-message">{message}</span>
-      <button className="toast-close" onClick={onClose}>×</button>
+      <button className="toast-close" onClick={onClose}>
+        ×
+      </button>
     </div>
   );
 };
 
 export default Toast;
-
