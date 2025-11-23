@@ -1,0 +1,32 @@
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.no-comments {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 12px;
+  border: 1px dashed rgba(139, 92, 246, 0.2);
+}
+
+.flagged-section {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 3px solid rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.05);
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.flagged-title {
+  color: #fca5a5;
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
