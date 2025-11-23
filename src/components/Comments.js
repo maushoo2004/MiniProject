@@ -8,7 +8,7 @@ import "./Comments.css";
 const Comments = ({ postId, isAuthor, showToast, user }) => {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { getUserProfile } = useAuth();
+  const { getUserProfile, refreshReportCount } = useAuth();
 
   // Fetch comments from Supabase
   useEffect(() => {
@@ -175,7 +175,7 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
     }
 
     try {
-      // Check if user has already reported this user for this comment
+      // Check if this specific comment has already been reported by this user
       const { data: existingReports, error: checkError } = await supabase
         .from("reports")
         .select("*")
@@ -188,11 +188,11 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
       }
 
       if (existingReports && existingReports.length > 0) {
-        showToast("You have already reported this user", "warning");
+        showToast("You have already reported this comment", "warning");
         return;
       }
 
-      // Create report
+      // Create report (allow same user to be reported multiple times for different comments)
       const { error: reportError } = await supabase.from("reports").insert([
         {
           reported_user_id: userId,
@@ -217,28 +217,70 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
         throw reportError;
       }
 
-      // Increment report count for the reported user
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("report_count")
-        .eq("id", userId)
-        .single();
+      // Increment report count for the reported user using database function
+      console.log("🔍 Incrementing report count for user:", userId);
 
-      const newReportCount = (profile?.report_count || 0) + 1;
+      // Use the database function to increment report count (bypasses RLS)
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "increment_user_report_count",
+        { target_user_id: userId }
+      );
 
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ report_count: newReportCount })
-        .eq("id", userId);
+      if (rpcError) {
+        console.error("❌ Error calling increment function:", rpcError);
+        console.error("Error details:", {
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
+        });
 
-      if (updateError) throw updateError;
+        // Fallback to direct update if function doesn't exist
+        console.log("⚠️ Falling back to direct update method...");
+        const { data: profile, error: fetchError } = await supabase
+          .from("profiles")
+          .select("report_count")
+          .eq("id", userId)
+          .single();
+
+        if (fetchError) {
+          console.error("❌ Error fetching profile:", fetchError);
+          throw fetchError;
+        }
+
+        console.log("📊 Current profile data:", profile);
+        const currentCount = profile?.report_count || 0;
+        const newReportCount = currentCount + 1;
+        console.log(
+          `📈 Incrementing report count: ${currentCount} → ${newReportCount}`
+        );
+
+        const { data: updateData, error: updateError } = await supabase
+          .from("profiles")
+          .update({ report_count: newReportCount })
+          .eq("id", userId)
+          .select();
+
+        if (updateError) {
+          console.error("❌ Error updating profile:", updateError);
+          console.error("Error details:", {
+            code: updateError.code,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+          });
+          throw updateError;
+        }
+
+        console.log("✅ Profile updated successfully (fallback):", updateData);
+      } else {
+        console.log("✅ Report count incremented successfully via function");
+      }
 
       // Mark comment as reported in local state immediately
       setComments((prevComments) =>
         prevComments.map((comment) =>
-          comment.id === commentId
-            ? { ...comment, isReported: true }
-            : comment
+          comment.id === commentId ? { ...comment, isReported: true } : comment
         )
       );
 
@@ -246,6 +288,12 @@ const Comments = ({ postId, isAuthor, showToast, user }) => {
         "User reported successfully. The comment has been removed from view.",
         "success"
       );
+
+      // Refresh the reported user's report count in auth context
+      // This is important if the reported user is the current logged-in user
+      if (refreshReportCount) {
+        refreshReportCount();
+      }
 
       // Refresh comments to ensure database state is synced
       // This will also update the reportedCommentIds check

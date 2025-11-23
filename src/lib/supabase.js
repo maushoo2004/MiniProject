@@ -16,9 +16,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const uploadImage = async (file, userId) => {
   try {
     // Debug: List all available buckets
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    console.log('Available buckets:', buckets);
-    if (listError) console.error('Error listing buckets:', listError);
+    const { data: buckets, error: listError } =
+      await supabase.storage.listBuckets();
+    console.log("Available buckets:", buckets);
+    if (listError) console.error("Error listing buckets:", listError);
 
     // Generate unique filename
     const fileExt = file.name.split(".").pop();
@@ -27,8 +28,8 @@ export const uploadImage = async (file, userId) => {
       .substring(7)}.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
 
-    console.log('Attempting to upload to blog-images bucket...');
-    console.log('File path:', filePath);
+    console.log("Attempting to upload to blog-images bucket...");
+    console.log("File path:", filePath);
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -69,14 +70,21 @@ export const deleteImage = async (filePath) => {
 // Fetch report count for a user
 export const getUserReportCount = async (userId) => {
   try {
-    const { count, error } = await supabase
-      .from('reports')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (error) throw error;
-    return count || 0;
+    // Get report count from profiles table
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("report_count")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching report count from profile:", error);
+      return 0;
+    }
+
+    return data?.report_count || 0;
   } catch (error) {
-    console.error('Error fetching report count:', error);
+    console.error("Error fetching report count:", error);
     return 0;
   }
 };
