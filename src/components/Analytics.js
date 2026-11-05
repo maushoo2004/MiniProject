@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import {
+  getCategoryColor,
+  getCategoryDisplayName,
+  getSeverityColor as severityColor,
+  getSourceLabel,
+} from "../utils/moderationLabels";
+import EmptyState from "./EmptyState";
+import { AnalyticsSkeleton } from "./Skeleton";
 import "./Analytics.css";
 
 const Analytics = ({ user, showToast }) => {
   const navigate = useNavigate();
+  const { blockThreshold } = useAuth();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState({
     totalPosts: 0,
@@ -12,13 +23,36 @@ const Analytics = ({ user, showToast }) => {
     posts: [],
   });
 
+  const [reportedIds, setReportedIds] = useState(new Set());
+
   useEffect(() => {
     if (!user) {
       navigate("/");
       return;
     }
     fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, navigate]);
+
+  const reportComment = async (commentId) => {
+    try {
+      const { reportCount, blocked } = await api("/api/reports", {
+        method: "POST",
+        body: { commentId, reason: "Reported from analytics dashboard" },
+      });
+      setReportedIds((prev) => new Set(prev).add(commentId));
+      showToast(
+        blocked
+          ? `Reported. This user now has ${reportCount} reports and is blocked from commenting.`
+          : `Reported. This user has ${reportCount} report${reportCount === 1 ? "" : "s"}.`,
+        "success"
+      );
+      fetchAnalytics();
+    } catch (err) {
+      if (err.status === 409) setReportedIds((prev) => new Set(prev).add(commentId));
+      showToast(err.message, err.status === 409 ? "warning" : "error");
+    }
+  };
 
   const fetchAnalytics = async () => {
     try {
@@ -51,7 +85,6 @@ const Analytics = ({ user, showToast }) => {
             profiles:user_id (
               id,
               name,
-              email,
               report_count
             )
           `
@@ -62,6 +95,12 @@ const Analytics = ({ user, showToast }) => {
         if (commentsError) throw commentsError;
         allComments = comments || [];
         flaggedComments = comments.filter((c) => c.is_flagged) || [];
+
+        const { data: myReports } = await supabase
+          .from("reports")
+          .select("comment_id")
+          .eq("reporter_id", user.id);
+        setReportedIds(new Set((myReports || []).map((r) => r.comment_id)));
 
         console.log("💬 Total comments:", allComments.length);
         console.log("🚩 Flagged comments:", flaggedComments.length);
@@ -81,7 +120,18 @@ const Analytics = ({ user, showToast }) => {
         totalFlagged: flaggedComments.length,
       });
 
+      const byCategory = {};
+      const bySeverity = { low: 0, medium: 0, high: 0 };
+      flaggedComments.forEach((c) => {
+        (c.categories || []).forEach((cat) => {
+          byCategory[cat] = (byCategory[cat] || 0) + 1;
+        });
+        if (c.severity in bySeverity) bySeverity[c.severity] += 1;
+      });
+
       setAnalytics({
+        byCategory,
+        bySeverity,
         totalPosts: posts.length,
         totalComments: allComments.length,
         totalFlagged: flaggedComments.length,
@@ -97,28 +147,8 @@ const Analytics = ({ user, showToast }) => {
     }
   };
 
-  const getCategoryBadgeColor = (category) => {
-    const colors = {
-      hate: "#ef4444",
-      threat: "#dc2626",
-      harassment: "#f97316",
-      profanity: "#f59e0b",
-      spam: "#84cc16",
-      sexual: "#ec4899",
-      violence: "#b91c1c",
-      bullying: "#fb923c",
-    };
-    return colors[category] || "#6b7280";
-  };
-
-  const getSeverityColor = (severity) => {
-    const colors = {
-      high: "#dc2626",
-      medium: "#f59e0b",
-      low: "#84cc16",
-    };
-    return colors[severity] || "#6b7280";
-  };
+  const getCategoryBadgeColor = getCategoryColor;
+  const getSeverityColor = severityColor;
 
   // Helper function to create SVG arc paths for pie chart
   const describeArc = (x, y, radius, startAngle, endAngle) => {
@@ -153,16 +183,7 @@ const Analytics = ({ user, showToast }) => {
     };
   };
 
-  if (loading) {
-    return (
-      <div className="analytics-container">
-        <div className="analytics-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading analytics...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <AnalyticsSkeleton />;
 
   return (
     <div className="analytics-container">
@@ -380,13 +401,76 @@ const Analytics = ({ user, showToast }) => {
         </div>
       </div>
 
+      {/* Moderation breakdown */}
+      {analytics.totalFlagged > 0 && (
+        <div className="analytics-section">
+          <h2>🧪 What ToxiFilter Caught</h2>
+          <div className="charts-container">
+            <div className="chart-card">
+              <h3>By Category</h3>
+              <div className="hbar-list">
+                {Object.entries(analytics.byCategory || {})
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([cat, n]) => (
+                    <div key={cat} className="hbar-row">
+                      <span className="hbar-label">{getCategoryDisplayName(cat)}</span>
+                      <div className="hbar-track">
+                        <div
+                          className="hbar-fill"
+                          style={{
+                            width: `${(n / analytics.totalFlagged) * 100}%`,
+                            backgroundColor: getCategoryColor(cat),
+                          }}
+                        />
+                      </div>
+                      <span className="hbar-value">{n}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div className="chart-card">
+              <h3>By Severity</h3>
+              <div className="hbar-list">
+                {["high", "medium", "low"].map((sev) => (
+                  <div key={sev} className="hbar-row">
+                    <span className="hbar-label" style={{ textTransform: "capitalize" }}>
+                      {sev}
+                    </span>
+                    <div className="hbar-track">
+                      <div
+                        className="hbar-fill"
+                        style={{
+                          width: `${
+                            ((analytics.bySeverity?.[sev] || 0) / analytics.totalFlagged) * 100
+                          }%`,
+                          backgroundColor: getSeverityColor(sev),
+                        }}
+                      />
+                    </div>
+                    <span className="hbar-value">{analytics.bySeverity?.[sev] || 0}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Posts Breakdown */}
       <div className="analytics-section">
         <h2>📝 Posts Breakdown</h2>
         {analytics.posts.length === 0 ? (
-          <div className="empty-state">
-            <p>No posts yet. Create your first post!</p>
-          </div>
+          <EmptyState
+            icon="📝"
+            title="No posts yet"
+            action={
+              <Link to="/create" className="btn btn-primary btn-sm">
+                ✏️ Write your first post
+              </Link>
+            }
+          >
+            Once you publish a post, you will see its comments and how many ToxiFilter flagged here.
+          </EmptyState>
         ) : (
           <div className="posts-table-container">
             <table className="analytics-table">
@@ -462,7 +546,7 @@ const Analytics = ({ user, showToast }) => {
                           <strong>
                             {comment.profiles?.name || "Anonymous User"}
                           </strong>
-                          {comment.profiles?.report_count >= 3 && (
+                          {comment.profiles?.report_count >= blockThreshold && (
                             <span className="blocked-indicator-inline">
                               🚫 Blocked
                             </span>
@@ -534,26 +618,20 @@ const Analytics = ({ user, showToast }) => {
                                   getCategoryBadgeColor(category),
                               }}
                             >
-                              {category}
+                              {getCategoryDisplayName(category)}
                             </span>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {comment.source && (
+                    {comment.moderation_source && (
                       <div className="metadata-item">
                         <span className="metadata-label">
                           Detection Source:
                         </span>
                         <span className="source-badge">
-                          {comment.source === "huggingface"
-                            ? "🤗 Hugging Face AI"
-                            : comment.source === "openai"
-                            ? "🤖 OpenAI"
-                            : comment.source === "keyword"
-                            ? "🔍 Keyword Filter"
-                            : comment.source}
+                          {getSourceLabel(comment.moderation_source)}
                         </span>
                       </div>
                     )}
@@ -567,11 +645,21 @@ const Analytics = ({ user, showToast }) => {
                       View Post
                     </button>
                     <div className="comment-meta-info">
-                      <span className="info-label">User Email:</span>
+                      <span className="info-label">Reports on user:</span>
                       <span className="info-value">
-                        {comment.profiles?.email || "N/A"}
+                        {comment.profiles?.report_count ?? 0}/{blockThreshold}
                       </span>
                     </div>
+                    {reportedIds.has(comment.id) ? (
+                      <span className="reported-tag">✔ Reported</span>
+                    ) : (
+                      <button
+                        className="report-button"
+                        onClick={() => reportComment(comment.id)}
+                      >
+                        🚨 Report User
+                      </button>
+                    )}
                   </div>
                 </div>
               );

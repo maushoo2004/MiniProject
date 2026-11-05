@@ -1,7 +1,7 @@
 {
-  "name": "blog-site",
-  "version": "1.0.0",
-  "description": "A blog site with comment moderation",
+  "name": "toxifilter-blogx",
+  "version": "2.0.0",
+  "description": "BlogX \u2014 a blogging platform protected by ToxiFilter, a multilingual AI comment-moderation engine",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
@@ -11,15 +11,20 @@
     "@supabase/supabase-js": "^2.38.4",
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "node-fetch": "^2.7.0"
+    "dotenv": "^16.4.5",
+    "express-rate-limit": "^7.4.0"
   },
   "scripts": {
     "start": "react-scripts start",
-    "server": "node server.js",
-    "dev": "concurrently \"npm run server\" \"npm start\"",
+    "server": "node server/index.js",
+    "dev": "concurrently --kill-others-on-fail -n api,web,ml -c magenta,cyan,yellow \"npm run server\" \"npm start\" \"npm run ml\"",
+    "ml": "node scripts/start-ml.js",
     "build": "react-scripts build",
+    "serve": "npm run build && NODE_ENV=production node server/index.js",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "test:server": "node --test server/tests/*.test.js",
+    "eval": "node server/eval/evaluate.js",
+    "eval:heldout": "node server/eval/heldout.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
@@ -40,6 +45,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "proxy": "http://localhost:3001",
+  "engines": {
+    "node": ">=18"
   }
 }
-

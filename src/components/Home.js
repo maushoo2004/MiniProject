@@ -1,306 +1,239 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { api } from "../lib/api";
+import ToxiDemo from "./ToxiDemo";
+import EmptyState from "./EmptyState";
+import { HomeSkeleton } from "./Skeleton";
 import "./Home.css";
-import Toxi from "../assets/toxifilter.jpg";
 
-const Home = ({ blogs, loading, showToast, user, onAuthClick }) => {
+const PIPELINE = [
+  { icon: "⌨️", title: "You type", text: "A comment is sent to our server, never checked in the browser, so it can't be skipped." },
+  { icon: "🔎", title: "Keyword engine + our ML model", text: "A multilingual keyword engine always runs; ToxiFilter ML, our own trained model, adds a second opinion." },
+  { icon: "✨", title: "Warning + polite rewrite", text: "Toxic text isn't saved yet. The writer sees why, and gets a kinder rewrite that keeps their point." },
+  { icon: "🚨", title: "Reports & blocking", text: "Posting it anyway hides it and files a report. Enough reports block the account." },
+];
+
+const FEATURES = [
+  { icon: "🌐", title: "Four languages", text: "English, Hindi (Devanagari), Hinglish and Kannada." },
+  { icon: "🕵️", title: "Disguise-proof", text: "Catches f*ck, sh1t, a$$hole and fuuuck, not just clean spellings." },
+  { icon: "🔬", title: "Explainable", text: "Shows the category, severity, score and the exact words that triggered it." },
+  { icon: "🎯", title: "Few false alarms", text: "Whole-word matching: Gandhi, skill and class are fine." },
+  { icon: "💙", title: "Self-harm aware", text: "Distress isn't punished; the writer is shown a helpline instead." },
+  { icon: "🔐", title: "Secure by design", text: "API keys stay on the server and the database rejects direct comment inserts." },
+];
+
+const initialOf = (name) => (name || "?").trim().charAt(0).toUpperCase() || "?";
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
+const Home = ({ blogs, loading, user, onAuthClick }) => {
   const { isBlocked, userReportCount } = useAuth();
-  // Image URLs for the slideshow - Add your image URLs here
-  const heroImages = [
-    "https://images.unsplash.com/photo-1556711905-4bd1b6603275?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    "https://images.unsplash.com/photo-1502465771179-51f3535da42c?q=80&w=1169&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    "https://images.unsplash.com/photo-1516414447565-b14be0adf13e?q=80&w=1073&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  const [search, setSearch] = useState("");
+  const [stats, setStats] = useState(null);
+
+  // Live platform numbers from the ToxiFilter server (no made-up figures)
+  useEffect(() => {
+    api("/api/stats", { auth: false })
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, [blogs.length]);
+
+  const query = search.trim().toLowerCase();
+  const visibleBlogs = query
+    ? blogs.filter((b) => [b.title, b.excerpt, b.author].some((f) => (f || "").toLowerCase().includes(query)))
+    : blogs;
+
+  const statItems = [
+    { value: stats?.posts, label: "Posts" },
+    { value: stats?.commentsScreened, label: "Comments screened" },
+    { value: stats?.flagged, label: "Toxic comments stopped" },
+    { value: stats ? `${stats.cleanRate}%` : undefined, label: "Clean rate" },
+    { value: "4", label: "Languages" },
   ];
 
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
-
-  // Auto-advance slideshow every 5 seconds
-  React.useEffect(() => {
-    if (heroImages.length === 0) return;
-
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [heroImages.length]);
-
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-  };
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? heroImages.length - 1 : prev - 1
+  const writeCta = (className, label) =>
+    user ? (
+      <Link to="/create" className={className}>
+        {label}
+      </Link>
+    ) : (
+      <button type="button" className={className} onClick={onAuthClick}>
+        {label}
+      </button>
     );
-  };
-
-  const goToImage = (index) => {
-    setCurrentImageIndex(index);
-  };
-
-  if (loading) {
-    return (
-      <div className="home">
-        <div className="loading-state">
-          <p>Loading posts...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="home">
-      {/* Blocked User Alert */}
       {user && isBlocked && (
         <div className="blocked-alert">
           <div className="blocked-alert-content">
             <span className="blocked-icon">🚫</span>
             <div className="blocked-text">
               <strong>Account Restricted</strong>
-              <p>
-                Your account has been reported {userReportCount} times and is
-                blocked from commenting on posts.
-              </p>
+              <p>Your account has been reported {userReportCount} times and is blocked from commenting on posts.</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="hero-section">
-        <div className="hero-content">
-          <div className="hero-text">
-            <h1 className="hero-title">Welcome to BlogX</h1>
-            <p className="hero-description">
-              Your platform for sharing ideas, stories, and insights with a
-              global community. Join thousands of writers who are making their
-              voices heard. Create, publish, and engage with content that
-              matters.
-            </p>
-            {user ? (
-              <Link to="/create" className="hero-cta-button">
-                <span>✏️</span> Start Writing
-              </Link>
-            ) : (
-              <button className="hero-cta-button" onClick={onAuthClick}>
-                <span>🚀</span> Get Started
-              </button>
-            )}
-          </div>
-          <div className="hero-image">
-            {heroImages.length > 0 ? (
-              <div className="image-slideshow">
-                <div className="slideshow-container">
-                  {heroImages.map((image, index) => (
-                    <div
-                      key={index}
-                      className={`slide ${
-                        index === currentImageIndex ? "active" : ""
-                      }`}
-                      style={{ backgroundImage: `url(${image})` }}
-                    />
-                  ))}
-                </div>
-                {heroImages.length > 1 && (
-                  <>
-                    <button
-                      className="slide-btn prev"
-                      onClick={prevImage}
-                      aria-label="Previous image"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      className="slide-btn next"
-                      onClick={nextImage}
-                      aria-label="Next image"
-                    >
-                      ›
-                    </button>
-                    <div className="slide-dots">
-                      {heroImages.map((_, index) => (
-                        <button
-                          key={index}
-                          className={`dot ${
-                            index === currentImageIndex ? "active" : ""
-                          }`}
-                          onClick={() => goToImage(index)}
-                          aria-label={`Go to image ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="image-placeholder">
-                <span className="placeholder-icon">📝</span>
-                <p className="placeholder-text">Your Story Here</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="home-header">
-        <div className="header-content">
-          <div>
-            <h2>Latest Blog Posts</h2>
-            <p>Explore thoughts and ideas from our community</p>
-          </div>
-          {user ? (
-            <Link to="/create" className="create-post-button">
-              ✏️ Create Post
+      {/* ---------------- hero ---------------- */}
+      <section className="hm-hero">
+        <div className="hm-hero-text">
+          <span className="hm-badge">🛡️ Protected by ToxiFilter AI</span>
+          <h1 className="hm-title">
+            Write freely.
+            <br />
+            <span className="hm-gradient">Discuss safely.</span>
+          </h1>
+          <p className="hm-lead">
+            BlogX is a blogging platform where every comment is checked on our server before it's saved. ToxiFilter
+            understands English, Hindi, Hinglish and Kannada, explains what it found, and offers a kinder way to say
+            it.
+          </p>
+          <div className="hm-cta">
+            {writeCta("btn btn-primary", "✏️ Start Writing")}
+            <Link to="/lab" className="btn btn-ghost">
+              Try ToxiFilter →
             </Link>
-          ) : (
-            <button className="create-post-button" onClick={onAuthClick}>
-              ✏️ Create Post (Login Required)
-            </button>
-          )}
+          </div>
         </div>
-      </div>
-      <div className="blog-list">
-        {blogs.map((blog) => (
-          <Link to={`/post/${blog.id}`} key={blog.id} className="blog-card">
-            {blog.image_url && (
-              <div className="blog-card-image">
-                <img src={blog.image_url} alt={blog.title} />
-              </div>
-            )}
-            <div className="blog-card-content">
-              <div className="blog-card-header">
-                <h3>{blog.title}</h3>
-                <div className="blog-meta">
-                  <span className="blog-author">By {blog.author}</span>
-                  <span className="blog-date">
-                    {blog.created_at
-                      ? new Date(blog.created_at).toLocaleDateString()
-                      : new Date(blog.date).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-              <p className="blog-excerpt">{blog.excerpt}</p>
-              <div className="blog-card-footer">
-                <span className="read-more">Read more →</span>
-              </div>
-            </div>
-          </Link>
+
+        <div className="hm-hero-demo">
+          <ToxiDemo compact />
+        </div>
+      </section>
+
+      {/* ---------------- stats ---------------- */}
+      <section className="hm-stats" aria-label="Platform statistics">
+        {statItems.map((s) => (
+          <div key={s.label} className="hm-stat glass">
+            <div className="hm-stat-value">{s.value ?? "—"}</div>
+            <div className="hm-stat-label">{s.label}</div>
+          </div>
         ))}
-      </div>
-      {blogs.length === 0 && (
-        <div className="empty-state">
-          <p>No blog posts yet. Be the first to share your thoughts!</p>
-        </div>
-      )}
+      </section>
 
-      {/* ToxiFilter Section */}
-      <div className="toxifilter-section">
-        <div className="toxifilter-header">
-          <div className="toxifilter-badge">
-            <span className="badge-icon">🛡️</span>
-            <span className="badge-text">Powered by ToxiFilter AI</span>
+      {/* ---------------- posts ---------------- */}
+      <section className="hm-posts" id="posts">
+        <div className="hm-section-head">
+          <div>
+            <h2>Latest posts</h2>
+            <p>Thoughts and ideas from the community</p>
           </div>
-          <h2 className="toxifilter-title">
-            AI-Powered Real-Time Protection Against Social Media Harassment
-          </h2>
-        </div>
-
-        <div className="toxifilter-content">
-          <div className="toxifilter-text">
-            <div className="toxifilter-intro">
-              <p>
-                <strong>ToxiFilter</strong> is an intelligent, AI-driven
-                moderation engine built to make social media a safer, healthier
-                space. In today's digital world, harmful and toxic comments
-                spread at lightning speed, often long before any human moderator
-                can intervene. This creates emotional harm, discourages healthy
-                conversations, and damages the overall online experience.
-              </p>
-            </div>
-
-            <div className="toxifilter-features">
-              <div className="feature-card">
-                <div className="feature-icon">⚡</div>
-                <div className="feature-content">
-                  <h4>Real-Time Detection</h4>
-                  <p>
-                    ToxiFilter connects directly to social media APIs to
-                    continuously monitor live comment streams. As soon as a user
-                    posts something, it instantly analyzes and identifies
-                    harmful intent.
-                  </p>
-                </div>
-              </div>
-
-              <div className="feature-card">
-                <div className="feature-icon">🤖</div>
-                <div className="feature-content">
-                  <h4>AI-Generated Alternatives</h4>
-                  <p>
-                    The system can block or flag harmful content before it
-                    reaches a wider audience, provide immediate warnings, and
-                    suggest more constructive alternatives using AI-generated
-                    rephrasing.
-                  </p>
-                </div>
-              </div>
-
-              <div className="feature-card">
-                <div className="feature-icon">🚀</div>
-                <div className="feature-content">
-                  <h4>End-to-End Automation</h4>
-                  <p>
-                    Removes the need for manual moderation in high-velocity
-                    environments where human review cannot keep up. Built with
-                    Python (Flask/FastAPI) for low-latency processing.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="toxifilter-technical">
-              <p>
-                Designed for{" "}
-                <strong>
-                  scalability, accuracy, and real-time responsiveness
-                </strong>
-                , ToxiFilter is not just a tool—it's a crucial safety layer for
-                modern social platforms. Whether it's handling slang,
-                multi-language content, or nuanced toxic behavior, ToxiFilter
-                aims to redefine how online communities maintain healthy
-                interactions.
-              </p>
-              <p className="toxifilter-credit">
-                <span className="sparkle">✨</span> Made with ❤️ by{" "}
-                <strong>Innovative D</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="toxifilter-visual">
-            <div className="screenshot-container">
-              {/* Replace with actual screenshot: */}
-              <img src={Toxi} alt="ToxiFilter Dashboard" />
-            </div>
-
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-value">99.2%</div>
-                <div className="stat-label">Accuracy Rate</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">&lt;50ms</div>
-                <div className="stat-label">Response Time</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">24/7</div>
-                <div className="stat-label">Active Protection</div>
-              </div>
-            </div>
+          <div className="hm-tools">
+            <input
+              type="search"
+              className="hm-search"
+              placeholder="🔍 Search posts or authors…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search posts"
+            />
+            {writeCta("btn btn-primary btn-sm", "✏️ New post")}
           </div>
         </div>
-      </div>
+
+        {loading ? (
+          <HomeSkeleton />
+        ) : visibleBlogs.length === 0 ? (
+          blogs.length === 0 ? (
+            <EmptyState icon="📝" title="No posts yet" action={writeCta("btn btn-primary btn-sm", "✏️ Write the first post")}>
+              Be the first to share your thoughts. Every comment on your post is checked by ToxiFilter.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              icon="🔍"
+              title="No matching posts"
+              action={
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSearch("")}>
+                  Clear search
+                </button>
+              }
+            >
+              Nothing matches "{search}". Try a different word or an author's name.
+            </EmptyState>
+          )
+        ) : (
+          <div className="hm-grid">
+            {visibleBlogs.map((blog) => (
+              <Link to={`/post/${blog.id}`} key={blog.id} className="hm-card glass">
+                <div className="hm-card-cover">
+                  {blog.image_url ? (
+                    <img src={blog.image_url} alt="" loading="lazy" />
+                  ) : (
+                    <div className="hm-card-placeholder" aria-hidden="true">
+                      <span>{initialOf(blog.title)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="hm-card-body">
+                  <h3>{blog.title}</h3>
+                  <p className="hm-card-excerpt">{blog.excerpt}</p>
+                  <div className="hm-card-meta">
+                    <span className="hm-avatar" aria-hidden="true">
+                      {initialOf(blog.author)}
+                    </span>
+                    <div className="hm-card-who">
+                      <strong>{blog.author}</strong>
+                      <span>
+                        {formatDate(blog.created_at)} · {blog.readMinutes} min read
+                      </span>
+                    </div>
+                    <span className="hm-card-comments" title="Comments">
+                      💬 {blog.commentCount}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ---------------- how it works ---------------- */}
+      <section className="hm-how">
+        <div className="hm-section-head hm-center">
+          <div>
+            <h2>How ToxiFilter works</h2>
+            <p>From keystroke to accountability in four steps</p>
+          </div>
+        </div>
+
+        <ol className="hm-pipeline">
+          {PIPELINE.map((step, i) => (
+            <li key={step.title} className="hm-step glass">
+              <span className="hm-step-num">{i + 1}</span>
+              <div className="hm-step-icon" aria-hidden="true">
+                {step.icon}
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="hm-features">
+          {FEATURES.map((f) => (
+            <div key={f.title} className="hm-feature">
+              <span className="hm-feature-icon" aria-hidden="true">
+                {f.icon}
+              </span>
+              <div>
+                <h4>{f.title}</h4>
+                <p>{f.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hm-how-cta">
+          <Link to="/lab" className="btn btn-ghost">
+            Explore the ToxiFilter Lab →
+          </Link>
+        </div>
+      </section>
     </div>
   );
 };

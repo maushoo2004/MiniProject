@@ -1,50 +1,32 @@
 import { createClient } from "@supabase/supabase-js";
 
-// These will be set from environment variables
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    "Supabase URL and Anon Key must be set in environment variables"
-  );
-}
+export const isSupabaseConfigured =
+  /^https:\/\/.+\.supabase\.co/.test(supabaseUrl) && supabaseAnonKey.length > 20;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// A placeholder keeps the app from crashing so we can show a friendly setup screen instead.
+export const supabase = createClient(
+  isSupabaseConfigured ? supabaseUrl : "https://placeholder.supabase.co",
+  isSupabaseConfigured ? supabaseAnonKey : "placeholder-anon-key"
+);
 
-// Image upload utility functions
+const BUCKET = "blog-images";
+
 export const uploadImage = async (file, userId) => {
   try {
-    // Debug: List all available buckets
-    const { data: buckets, error: listError } =
-      await supabase.storage.listBuckets();
-    console.log("Available buckets:", buckets);
-    if (listError) console.error("Error listing buckets:", listError);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const filePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    // Generate unique filename
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(7)}.${fileExt}`;
-    const filePath = `${userId}/${fileName}`;
-
-    console.log("Attempting to upload to blog-images bucket...");
-    console.log("File path:", filePath);
-
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from("blog-images")
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file, { cacheControl: "3600", upsert: false });
     if (error) throw error;
 
-    // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("blog-images").getPublicUrl(filePath);
+    } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
 
     return { url: publicUrl, path: filePath, error: null };
   } catch (error) {
@@ -53,38 +35,41 @@ export const uploadImage = async (file, userId) => {
   }
 };
 
+/** Turns a stored public URL back into its storage path (for deleting). */
+export const storagePathFromUrl = (url) => {
+  if (!url) return null;
+  const marker = `/object/public/${BUCKET}/`;
+  const i = url.indexOf(marker);
+  return i === -1 ? null : decodeURIComponent(url.slice(i + marker.length));
+};
+
 export const deleteImage = async (filePath) => {
-  try {
-    const { error } = await supabase.storage
-      .from("blog-images")
-      .remove([filePath]);
-
-    if (error) throw error;
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Error deleting image:", error);
-    return { success: false, error };
-  }
+  if (!filePath) return { success: true, error: null };
+  const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
+  if (error) console.error("Error deleting image:", error);
+  return { success: !error, error };
 };
 
-// Fetch report count for a user
-export const getUserReportCount = async (userId) => {
-  try {
-    // Get report count from profiles table
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("report_count")
-      .eq("id", userId)
-      .single();
+/** Shared post-row → UI shape mapping */
+export const mapPost = (post) => ({
+  id: post.id,
+  title: post.title,
+  content: post.content,
+  excerpt: post.excerpt || post.content.slice(0, 150) + (post.content.length > 150 ? "..." : ""),
+  image_url: post.image_url,
+  author: post.profiles?.name || "Unknown",
+  authorId: post.author_id,
+  created_at: post.created_at,
+  updated_at: post.updated_at,
+  // comments(count) comes back as [{ count: N }] (only comments this viewer is allowed to see)
+  commentCount: post.comments?.[0]?.count ?? 0,
+  readMinutes: readingMinutes(post.content),
+});
 
-    if (error) {
-      console.error("Error fetching report count from profile:", error);
-      return 0;
-    }
+/** Reading time at ~200 words per minute (at least 1). */
+export function readingMinutes(content) {
+  const words = (content || "").trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 200));
+}
 
-    return data?.report_count || 0;
-  } catch (error) {
-    console.error("Error fetching report count:", error);
-    return 0;
-  }
-};
+export const POST_SELECT = "*, profiles:author_id (id, name), comments(count)";

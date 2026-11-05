@@ -1,169 +1,155 @@
-# BlogSpace - Blog Site with Comment Moderation
+# BlogX × ToxiFilter
 
-A modern blog platform built with React.js that allows users to post blogs and comment on them, with an intelligent content moderation system to filter out inappropriate comments.
+**A blogging platform protected by ToxiFilter: a multilingual, AI-assisted comment moderation system that warns, suggests a polite rewrite, and holds repeat offenders accountable.**
 
-## Features
+Built with React, Node.js/Express, Supabase (PostgreSQL + Auth + Storage + Realtime), our own trained ML model (Python / scikit-learn) and a Groq-hosted LLM for polite rewrites.
 
-- 🔐 **Authentication**: User login/signup with Supabase
-- 📝 **Blog Posts**: Create and view blog posts
-- ✏️ **Create Posts**: Easy-to-use form to create new blog posts (login required)
-- 💬 **Comments**: Users can comment on blog posts (login required)
-- 🛡️ **Content Moderation**: Automatic filtering of toxic/harassing comments
-- 🌐 **Multi-language Support**: Works with Hindi and English (and many other languages)
-- 👁️ **Author View**: Blog authors can see flagged comments and report users
-- 📊 **Report System**: Track user reports with database integration
-- 🔔 **Toast Notifications**: User-friendly notifications for flagged comments
-- 🎨 **Modern UI/UX**: Clean and friendly interface
+---
 
-## Content Moderation API
+## What it does
 
-This project uses **Hugging Face Inference API** (primary) with OpenAI and keyword fallback for content moderation. It supports multiple languages including Hindi and English.
+| | |
+|---|---|
+| ✍️ **Blogging** | Sign up, write posts with cover images, edit/delete your posts, search, live updates |
+| 🛡️ **ToxiFilter moderation** | Every comment is checked on the server before it's saved |
+| 🌐 **Multilingual** | English, Hindi (Devanagari), Hinglish and Kannada, including disguised spellings (`f*ck`, `sh1t`, `a$$hole`, `fuuuck`) |
+| ✨ **AI rewrite** | Flagged comments get a polite rewrite (Groq LLM) that keeps the user's actual point |
+| 🔎 **Explainable** | Users see the category, severity, score and which words triggered the flag |
+| 🧠 **Our own ML model** | A classifier we trained (TF-IDF + logistic regression) on 10,660 public English, Hinglish, Hindi and Kannada comments, served by a small Python service next to the keyword engine |
+| 🧪 **ToxiFilter Lab** | A public page to try any text: per-category scores, highlighted words, the ML model's probability, which provider decided, plus the measured **model performance** (F1, cross-validation, per-language chart, keyword-vs-ML table) read from the real training results |
+| ⌨️ **Live typing meter** | While you type a comment, a thin bar shows whether it looks respectful or likely to be flagged |
+| 🚨 **Accountability** | Posting a flagged comment anyway hides it and files an automatic report; authors can report commenters; at N reports a user is blocked |
+| 💙 **Self-harm aware** | Self-harm messages are not punished; the user is shown a helpline (Tele-MANAS 14416) |
+| 📊 **Author analytics** | Comments, flagged content, category and severity breakdowns, report from dashboard |
+| 🧑‍⚖️ **Admin dashboard** | Platform totals, reported/blocked users, report history, delete flagged comments, unblock users |
+| 🔐 **Secure by design** | API keys only on the server; DB rules stop clients from inserting comments, editing report counts or reading emails |
 
-### Recommended: Hugging Face Inference API
+## Architecture
 
-- ✅ **Free Forever**: No credit card, no rate limits (reasonable use)
-- ✅ **Better Accuracy**: Specialized toxicity detection models
-- ✅ **Rephrasing Built-in**: Suggests polite alternatives automatically
-- ✅ **Multi-language**: Works with Hindi, English, and many others
-- ✅ **Simple Setup**: Just an API key
+```
+ Browser (React SPA)                    Node.js / Express  (server/)                 External
+ ───────────────────                    ───────────────────────────                  ────────
+ Read posts/comments ─── Supabase JS ──►  Supabase (Postgres + RLS) ◄── service role ──┐
+                                                                                        │
+ POST /api/comments ───────────────────► verify JWT → check block status               │
+                                          → moderate():                                │
+                                              1. keyword engine (always, offline)      │
+                                              2. ToxiFilter ML (optional) ─────────────┼─► ml/serve.py  (FastAPI :8000,
+                                                 POST /predict                         │   our own scikit-learn model)
+                                              3. merge scores & categories             │
+                                          → toxic & not confirmed? 422 + rewrite ──────┼─► Groq LLM (rewrites only)
+                                          → save comment (flagged or not) ─────────────┘
+                                          → flagged? insert report → DB trigger bumps report_count
+```
 
-### Quick Setup:
+Why the server matters: in v1 the moderation ran in the browser and the API keys were bundled into the JavaScript, so anyone could read the keys or insert comments directly. Now the database only accepts comment and report inserts from the server.
 
-1. **Get your Hugging Face API key**:
+### Moderation pipeline
 
-   - Visit: https://huggingface.co/settings/tokens
-   - Sign up or log in (free account)
-   - Create a new token with "Read" permissions
-   - Copy the token (starts with `hf_`)
+1. **Keyword engine** (`server/moderation/keywordEngine.js`) runs on every comment: whole-word, Unicode-aware matching over a weighted lexicon (`lexicon.js`) with leetspeak/masking tolerance, a "targeted at you" boost for insults, noisy-OR scoring per category, and severity levels.
+2. **ToxiFilter ML** (optional): our own classifier trained in `ml/` (character + word n-grams, logistic regression), served over HTTP and enabled by setting `ML_SERVICE_URL`. If the service is down, moderation carries on with the keyword engine alone.
+3. **Merge**: the stronger signal wins. The keyword engine knows Hindi, Hinglish and Kannada words the model may never have seen; the model can catch abuse that isn't on the word list.
+4. **Rewrite**: Groq LLM, re-checked by the keyword engine. Offline fallback strips the offensive words or uses a template.
 
-2. **Add to your project**:
-   - Create a `.env` file in the root directory
-   - Add: `REACT_APP_HUGGINGFACE_API_KEY=hf-your-token-here`
-   - (Optional) Also add: `REACT_APP_OPENAI_API_KEY=sk-your-key-here` for fallback
-   - Restart your dev server
+Categories: hate, threat, bullying, discrimination, harassment, profanity, sexual, violence, spam, self-harm.
 
-**See [HUGGINGFACE_SETUP.md](./HUGGINGFACE_SETUP.md) for detailed instructions.**
-
-### Fallback System:
-
-1. **Hugging Face** (Primary) - Best accuracy, free, no rate limits
-2. **OpenAI** (Fallback) - Good backup if HF unavailable
-3. **Keyword Detection** (Always works) - Catches common toxic words
-
-## Installation
-
-1. Install dependencies:
+## Quick start
 
 ```bash
 npm install
+cp .env.example .env        # fill in Supabase keys (see docs/SETUP.md)
+# run supabase/schema.sql in the Supabase SQL editor
+npm run dev                 # starts API on :3001, React on :3000 and (if trained) the ML service on :8000
 ```
 
-2. **Set up Supabase** (Required for authentication):
+Full step-by-step guide: **[docs/SETUP.md](docs/SETUP.md)**
 
-   - Follow the detailed guide in [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
-   - Create a Supabase project
-   - Set up database tables
-   - Get your API keys
+## Scripts
 
-3. **Set up environment variables**:
+| Command | What it does |
+|---|---|
+| `npm run dev` | API + React + ML service together (the ML service is skipped with a clear message if Python or the trained model is missing) |
+| `npm run server` | API server only |
+| `npm run ml` | ML service only (`ml/serve.py`); see [ml/README.md](ml/README.md) |
+| `npm start` | React dev server only |
+| `npm run build` | Production build of the frontend |
+| `npm run serve` | Build, then serve the whole app from the Node server (one process, for deployment) |
+| `npm run test:server` | 35 automated tests (keyword engine, API flow, ML provider) |
+| `npm run eval` | Accuracy report: v1 vs v2 engine on a labelled dataset (`-- --full` adds the ML model and the full pipeline) |
+| `npm run eval:heldout` | Keyword engine vs ML vs both on the held-out split of the real training data |
 
-   - Create a `.env` file in the root directory
-   - Add your Supabase credentials:
-     ```env
-     REACT_APP_SUPABASE_URL=https://xxxxx.supabase.co
-     REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-     REACT_APP_HUGGINGFACE_API_KEY=hf-your-token-here
-     REACT_APP_OPENAI_API_KEY=sk-your-key-here
-     ```
-   - Get Supabase keys from: https://supabase.com/dashboard
-   - Get Hugging Face token from: https://huggingface.co/settings/tokens (Recommended - Free!)
-   - Get OpenAI key from: https://platform.openai.com/api-keys (optional fallback)
+## Evaluation
 
-4. Start the development server:
+`npm run eval` scores the original v1 matcher against the new engine on `server/eval/dataset.json` (64 comments; English, Hinglish, Hindi, Kannada; including "trap" sentences like *"Gandhi"*, *"skill"*, *"I hate Mondays"*, *"caste discrimination awareness"*).
 
-```bash
-npm start
+| Engine | Accuracy | Precision | Recall | F1 | False alarms |
+|---|---|---|---|---|---|
+| v1 substring matcher | 53.1% | 55.0% | 64.7% | 59.5% | 18 |
+| v2 keyword engine | 100%* | 100%* | 100%* | 100%* | 0 |
+
+\* The v2 lexicon was tuned on this set, so these numbers are optimistic (see below for honest numbers).
+
+### On real data (ToxiFilter ML)
+
+The ML model is trained on 10,660 public comments in English, Hinglish, Hindi and Kannada (see [docs/EVALUATION.md](docs/EVALUATION.md) for sources, licences and limits). On the 2,132 held-out comments that neither the model nor the lexicon was tuned on:
+
+| System | Precision | Recall | F1 |
+|---|---|---|---|
+| Keyword engine alone | 94.3% | 41.4% | 57.5% |
+| ToxiFilter ML alone | 89.0% | 67.1% | 76.6% |
+| Keyword OR ML (the pipeline) | 86.9% | 69.3% | **77.1%** |
+
+F1 per language for the ML model: English 0.92, Hinglish 0.69, Kannada 0.57, Hindi 0.48. So the keyword engine's 100% above is a development-set score, not accuracy; the ML model is what covers real-world Hinglish, Hindi and Kannada.
+
+## API
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/health` | – | Which providers are configured |
+| GET | `/api/stats` | – | Public platform numbers (home page) |
+| GET | `/api/ml/performance` | – | The ML model's measured results (from `ml/metrics.json`), for the Lab |
+| GET | `/api/docs/evaluation` | – | `docs/EVALUATION.md` as plain text |
+| POST | `/api/moderate` | – | `{ text, suggest? }` → moderation result (+ rewrite) |
+| POST | `/api/comments` | user | `{ postId, content, acknowledgeWarning? }` → 201 saved / 422 needs review / 403 blocked |
+| POST | `/api/reports` | post author / admin | `{ commentId, reason? }` |
+| GET | `/api/admin/overview` | admin | Dashboard data |
+| POST | `/api/admin/users/:id/reset` | admin | Clear reports & unblock |
+| DELETE | `/api/admin/comments/:id` | admin | Delete a comment |
+
+## Project structure
+
 ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
-
-**Note**: You must set up Supabase before the app will work properly. See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions.
-
-## Project Structure
-
-```
+server/
+  index.js, app.js, config.js     Express API
+  moderation/
+    lexicon.js                    multilingual weighted word list
+    keywordEngine.js              rule engine (always on)
+    providers.js                  ML provider registry (our "custom" model service)
+    index.js                      pipeline + merge
+    rephrase.js                   Groq rewrite + fallback
+  tests/                          node:test suites (keyword engine, API flow, ML provider)
+  eval/                           dataset, v1 baseline, evaluate.js, heldout.js
+ml/                               our own ML model (Python): prepare_data.py, train.py, serve.py,
+                                  textnorm.py, train_transformer.py, README.md, data/
+scripts/start-ml.js               starts the ML service for `npm run dev` (skips politely if not set up)
+docs/                             SETUP.md, CHANGELOG.md, EVALUATION.md (the report chapter)
+supabase/schema.sql               tables, RLS, triggers, storage, realtime
 src/
-├── components/
-│   ├── Home.js              # Home page with blog list
-│   ├── CreateBlogPost.js    # Create new blog post form
-│   ├── BlogPost.js          # Individual blog post view
-│   ├── Comments.js          # Comments container
-│   ├── CommentForm.js       # Comment submission form
-│   ├── CommentList.js       # List of comments
-│   ├── CommentItem.js       # Individual comment display
-│   ├── Auth.js              # Login/Signup modal
-│   ├── ProtectedRoute.js    # Route protection component
-│   └── Toast.js             # Toast notification component
-├── contexts/
-│   └── AuthContext.js       # Authentication context provider
-├── lib/
-│   └── supabase.js          # Supabase client configuration
-├── services/
-│   └── moderationService.js # Content moderation API service (OpenAI)
-├── App.js                   # Main app component with routing
-└── index.js                 # Entry point
+  components/                     Navbar, Footer, Home, Lab, ToxiDemo, ModelPerformance, BlogPost,
+                                  CreateBlogPost (create+edit), Comments, CommentForm, LiveMeter,
+                                  Analytics, Admin, Auth, Toast, Skeleton, EmptyState, NotFound, ...
+  contexts/AuthContext.js         session, profile, block status, admin role
+  lib/supabase.js, lib/api.js     DB client + authenticated API client
+  utils/moderationLabels.js       category/severity/source display helpers
 ```
 
-## How It Works
+## Limitations / future work
 
-1. **Authentication**: Users must sign up/login to create posts and comment
-2. **Create Posts**: Logged-in users can create blog posts using the "Create Post" button
-3. **Comment Submission**: When a logged-in user submits a comment (in Hindi, English, or mixed), it's checked for toxicity
-4. **Moderation**: The comment is analyzed using OpenAI Moderation API (supports multiple languages)
-5. **Filtering**: If toxic, the comment is flagged and hidden from public view
-6. **Author View**: Blog authors can see all comments, including flagged ones (toggle "Author View" button)
-7. **Reporting**: Authors can report users who posted inappropriate comments (stored in Supabase)
-8. **Report Tracking**: User report counts are tracked in the database and incremented on each report
-9. **Notifications**: Users receive toast notifications when their comment is flagged
-
-## Testing the Moderation
-
-Try posting comments with:
-
-- English toxic words: "hate", "stupid", "idiot"
-- Hindi toxic words (transliterated): "bewakoof", "chutiya", "gadha"
-- Mixed language content
-
-The system will flag inappropriate content and show a toast notification.
-
-## Database Setup
-
-This project uses **Supabase** (PostgreSQL) for:
-
-- User authentication
-- User profiles with report counts
-- Report tracking
-
-See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed setup instructions.
-
-## Next Steps
-
-- [x] Set up database (Supabase/PostgreSQL)
-- [x] Implement user authentication
-- [ ] Connect blog posts to database
-- [ ] Connect comments to database
-- [ ] Add image uploads for blog posts
-- [ ] Add user profile pages
-- [ ] Add admin dashboard for managing reports
-
-## Technologies Used
-
-- React.js
-- React Router
-- Supabase (PostgreSQL + Authentication)
-- OpenAI Moderation API (for content moderation - supports Hindi, English, and many other languages)
-- CSS3
+- The ML model reads one comment as a bag of n-grams: no context, no sarcasm, and insults without abusive vocabulary are often missed. Recall is low for Kannada and Hindi (0.44 and 0.39), and the Hinglish and Hindi sets are small. See [docs/EVALUATION.md](docs/EVALUATION.md) for the numbers and caveats.
+- Fine-tuning a multilingual transformer such as MuRIL (`ml/train_transformer.py`, on a Colab GPU) is the next step; it has not been run yet.
+- Blog *posts* are checked in the browser before publishing (comments are enforced server-side).
+- An appeal flow for blocked users is not built yet.
 
 ## License
 
-MIT
+The code is MIT. **The ML model is trained on public datasets with their own licences, and one of them (the HASOC 2021 re-upload) is non-commercial**, so treat the trained model as for academic use. Details and citations: [docs/EVALUATION.md](docs/EVALUATION.md).

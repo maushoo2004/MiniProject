@@ -153,3 +153,46 @@
     max-height: 300px;
   }
 }
+/* ---- v2 additions ---- */
+.post-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.post-owner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.post-action-btn {
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.post-action-btn:hover {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+.post-action-btn.danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.post-action-btn.danger:hover {
+  background: rgba(220, 38, 38, 0.22);
+}
+
+.post-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

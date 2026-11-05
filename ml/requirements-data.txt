@@ -1,0 +1,4 @@
+# Only needed for prepare_data.py (downloads public datasets from the Hugging Face Hub).
+-r requirements.txt
+huggingface_hub>=0.23
+pyarrow>=14

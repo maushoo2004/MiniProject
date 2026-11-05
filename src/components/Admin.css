@@ -1,0 +1,118 @@
+.admin-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.admin-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.25rem 1rem;
+  border-radius: 14px;
+  background: rgba(17, 17, 27, 0.9);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.admin-total-icon {
+  font-size: 1.5rem;
+}
+
+.admin-total-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.admin-total-label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.admin-tab {
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: transparent;
+  color: #c4b5fd;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.admin-tab.active {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  border-color: transparent;
+}
+
+.admin-role-tag {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.3);
+  color: #ddd6fe;
+}
+
+.admin-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.admin-report {
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(17, 17, 27, 0.9);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.admin-report.resolved {
+  opacity: 0.6;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.admin-report-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.admin-source-tag {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-resolved {
+  font-size: 0.75rem;
+  color: #86efac;
+}
+
+.admin-muted {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.admin-quote {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 6px;
+  color: #e4e4e7;
+}

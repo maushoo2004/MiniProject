@@ -23,3 +23,17 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+
+# ML service (Python)
+ml/.venv/
+ml/__pycache__/
+ml/transformer_model/
+ml/data/*.csvml/data/raw/
+ml/train_run*.log
+ml/data/heldout_predictions.json
+
+# training data (re-download with ml/prepare_data.py)
+ml/data/*.csv
+ml/data/raw/
+ml/pipeline_on_heldout.json
+ml/.venv/

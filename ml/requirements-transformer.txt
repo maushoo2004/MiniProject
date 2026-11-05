@@ -1,0 +1,6 @@
+# Only for train_transformer.py / serve.py --transformer (large downloads; a GPU is strongly recommended).
+# On Google Colab, torch is already installed: just `pip install transformers accelerate scikit-learn pandas`.
+-r requirements.txt
+torch>=2.1
+transformers>=4.40
+accelerate>=0.27

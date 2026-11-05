@@ -1,11 +1,21 @@
-import React, { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase, uploadImage } from "../lib/supabase";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { supabase, uploadImage, deleteImage, storagePathFromUrl } from "../lib/supabase";
+import { api } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
+import { getCategoryDisplayName } from "../utils/moderationLabels";
+import { PageSkeleton } from "./Skeleton";
 import "./CreateBlogPost.css";
 
-const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
+const CreateBlogPost = ({ onAddPost, showToast }) => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const editingId = id ? parseInt(id, 10) : null;
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
+  const originalImageUrl = useRef(null);
+  const [existingImageUrl, setExistingImageUrl] = useState(null);
+  const [loadingPost, setLoadingPost] = useState(Boolean(editingId));
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -15,6 +25,33 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Load the post when editing
+  useEffect(() => {
+    if (!editingId || !user) return;
+    supabase
+      .from("posts")
+      .select("id, title, content, excerpt, image_url, author_id")
+      .eq("id", editingId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          showToast("Post not found", "error");
+          navigate("/");
+          return;
+        }
+        if (data.author_id !== user.id) {
+          showToast("You can only edit your own posts", "error");
+          navigate(`/post/${editingId}`);
+          return;
+        }
+        setFormData({ title: data.title, content: data.content, excerpt: data.excerpt || "" });
+        setExistingImageUrl(data.image_url);
+        originalImageUrl.current = data.image_url;
+        setImagePreview(data.image_url);
+        setLoadingPost(false);
+      });
+  }, [editingId, user, navigate, showToast]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -70,6 +107,7 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setExistingImageUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -83,7 +121,7 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
       return;
     }
 
-    if (!user || !userProfile) {
+    if (!user) {
       showToast("Please login to create a post", "error");
       return;
     }
@@ -92,7 +130,29 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
     setUploadProgress(0);
 
     try {
-      let imageUrl = null;
+      // Posts go through ToxiFilter too
+      setUploadProgress(15);
+      try {
+        const { moderation } = await api("/api/moderate", {
+          method: "POST",
+          body: { text: `${formData.title}\n${formData.excerpt}\n${formData.content}` },
+        });
+        if (moderation.isToxic && moderation.severity !== "low") {
+          showToast(
+            `ToxiFilter flagged this post (${moderation.categories
+              .map(getCategoryDisplayName)
+              .join(", ")}). Please edit it before publishing.`,
+            "error",
+            7000
+          );
+          return;
+        }
+      } catch (err) {
+        // Server down: don't lose the user's post, just warn
+        console.warn("Moderation unavailable for post:", err.message);
+      }
+
+      let imageUrl = existingImageUrl;
 
       // Upload image if selected
       if (imageFile) {
@@ -116,42 +176,51 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
         formData.content.substring(0, 150) +
           (formData.content.length > 150 ? "..." : "");
 
-      // Save to Supabase
-      const { data, error } = await supabase
-        .from("posts")
-        .insert([
-          {
-            title: formData.title,
-            content: formData.content,
-            excerpt: excerpt,
-            image_url: imageUrl,
-            author_id: user.id,
-          },
-        ])
-        .select()
-        .single();
+      const fields = {
+        title: formData.title.trim(),
+        content: formData.content,
+        excerpt,
+        image_url: imageUrl,
+      };
+
+      const query = editingId
+        ? supabase.from("posts").update(fields).eq("id", editingId)
+        : supabase.from("posts").insert([{ ...fields, author_id: user.id }]);
+      const { data, error } = await query.select().single();
 
       if (error) throw error;
 
+      // Clean up a replaced/removed cover image
+      if (originalImageUrl.current && originalImageUrl.current !== imageUrl) {
+        deleteImage(storagePathFromUrl(originalImageUrl.current));
+      }
+
       setUploadProgress(100);
-      showToast("Blog post created successfully!", "success");
+      showToast(editingId ? "Post updated!" : "Blog post created successfully!", "success");
 
       // Refresh posts and navigate to the new post
       onAddPost();
       navigate(`/post/${data.id}`);
     } catch (error) {
       console.error("Error creating post:", error);
-      showToast("Error creating post. Please try again.", "error");
+      showToast(
+        `Error ${editingId ? "updating" : "creating"} post. Please try again.`,
+        "error"
+      );
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);
     }
   };
 
+  if (loadingPost) {
+    return <PageSkeleton label="Loading post…" />;
+  }
+
   return (
     <div className="create-blog-post">
       <div className="create-post-header">
-        <h2>Create New Blog Post</h2>
+        <h2>{editingId ? "Edit Blog Post" : "Create New Blog Post"}</h2>
         <p>Share your thoughts with the community</p>
       </div>
 
@@ -206,7 +275,7 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
             type="file"
             ref={fileInputRef}
             accept="image/*"
-            onChange={handleImageFile}
+            onChange={handleImageSelect}
             style={{ display: "none" }}
           />
 
@@ -273,7 +342,7 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
           <button
             type="button"
             className="cancel-button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(editingId ? `/post/${editingId}` : "/")}
             disabled={isSubmitting}
           >
             Cancel
@@ -283,7 +352,13 @@ const CreateBlogPost = ({ onAddPost, showToast, user, userProfile }) => {
             className="submit-button"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Publishing..." : "Publish Post"}
+            {isSubmitting
+              ? editingId
+                ? "Saving..."
+                : "Publishing..."
+              : editingId
+              ? "Save Changes"
+              : "Publish Post"}
           </button>
         </div>
       </form>

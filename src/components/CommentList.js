@@ -1,35 +1,27 @@
 import React from "react";
 import CommentItem from "./CommentItem";
+import EmptyState from "./EmptyState";
 import "./CommentList.css";
 
-const CommentList = ({ comments, isAuthor, onReportUser }) => {
-  // For authors: show all comments EXCEPT reported flagged ones (they're already handled)
-  // For public: only show non-flagged, non-reported comments
-  const visibleComments = isAuthor
-    ? comments.filter((comment) => {
-        // Authors see all comments, but don't show flagged comments that are already reported
-        // (reported comments are handled separately)
-        if (comment.isFlagged && comment.isReported) {
-          return false; // Don't show reported flagged comments in the list
-        }
-        return true;
-      })
-    : comments.filter((comment) => !comment.isFlagged && !comment.isReported);
+const CommentList = ({ comments, isAuthor, canModerate, onReportUser, onDelete }) => {
+  // Readers don't see comments they've already reported
+  const visible = comments.filter((c) => isAuthor || !c.isReported);
 
   return (
     <div className="comment-list">
-      {visibleComments.length === 0 ? (
-        <div className="no-comments">
-          <p>No comments yet. Be the first to share your thoughts!</p>
-        </div>
+      {visible.length === 0 ? (
+        <EmptyState compact icon="💬" title="No comments yet">
+          Be the first to share your thoughts. Comments are checked by ToxiFilter before they are saved.
+        </EmptyState>
       ) : (
-        visibleComments.map((comment) => (
+        visible.map((comment) => (
           <CommentItem
             key={comment.id}
             comment={comment}
-            isAuthor={isAuthor}
-            isFlagged={comment.isFlagged}
+            canReport={canModerate && !comment.isOwn}
+            canDelete={comment.isOwn || canModerate}
             onReportUser={onReportUser}
+            onDelete={onDelete}
           />
         ))
       )}

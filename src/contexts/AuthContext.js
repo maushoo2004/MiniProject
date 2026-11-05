@@ -1,166 +1,94 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { BLOCK_THRESHOLD } from "../lib/api";
 
-const AuthContext = createContext({});
+const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [userReportCount, setUserReportCount] = useState(0);
-  const [isBlocked, setIsBlocked] = useState(false);
+
+  const loadProfile = useCallback(async (userId) => {
+    if (!userId) {
+      setProfile(null);
+      return null;
+    }
+    // email is intentionally not selectable by clients — use user.email instead
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, report_count, role, created_at")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) console.error("Error fetching profile:", error);
+    setProfile(data || null);
+    return data;
+  }, []);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserReportCount(session.user.id);
-      }
-      setLoading(false);
+      loadProfile(session?.user?.id).finally(() => setLoading(false));
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserReportCount(session.user.id);
-      } else {
-        setUserReportCount(0);
-        setIsBlocked(false);
-      }
-      setLoading(false);
+      // defer to avoid calling Supabase inside the auth callback
+      setTimeout(() => loadProfile(session?.user?.id), 0);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserReportCount = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("report_count")
-        .eq("id", userId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching report count:", error);
-        return;
-      }
-
-      const count = data?.report_count || 0;
-      setUserReportCount(count);
-      setIsBlocked(count > 3);
-    } catch (error) {
-      console.error("Error fetching report count:", error);
-    }
-  };
+  }, [loadProfile]);
 
   const signUp = async (email, password, name) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      // Update user profile with name
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert([
-            {
-              id: data.user.id,
-              name: name,
-              email: email,
-              report_count: 0,
-            },
-          ])
-          .select();
-
-        if (profileError && profileError.code !== "23505") {
-          // Ignore duplicate key errors (profile might already exist)
-          console.error("Error creating profile:", profileError);
-        }
-      }
-
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
+    // The profile row is created by a database trigger (handle_new_user)
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
+    return { data, error };
   };
 
   const signIn = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    return { data, error };
   };
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      return { error };
-    }
+    const { error } = await supabase.auth.signOut();
+    return { error };
   };
 
-  const getUserProfile = async () => {
-    if (!user) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      return null;
-    }
-  };
+  const reportCount = profile?.report_count || 0;
 
   const value = {
     user,
     session,
+    profile,
     loading,
-    userReportCount,
-    isBlocked,
+    userReportCount: reportCount,
+    isBlocked: reportCount >= BLOCK_THRESHOLD,
+    isAdmin: profile?.role === "admin",
+    blockThreshold: BLOCK_THRESHOLD,
     signUp,
     signIn,
     signOut,
-    getUserProfile,
-    refreshReportCount: () => user && fetchUserReportCount(user.id),
+    refreshProfile: () => loadProfile(user?.id),
+    // kept for older components
+    refreshReportCount: () => loadProfile(user?.id),
+    getUserProfile: async () => profile || loadProfile(user?.id),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

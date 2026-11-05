@@ -1,0 +1,246 @@
+.lab {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.lab-head {
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+
+.lab-head h1 {
+  margin: 1rem auto 0.8rem;
+  max-width: 760px;
+  font-size: clamp(1.9rem, 4.2vw, 3rem);
+  line-height: 1.12;
+  color: #fff;
+}
+
+.lab-head p {
+  max-width: 640px;
+  margin: 0 auto;
+  color: var(--text-dim);
+  font-size: 1.02rem;
+}
+
+/* ---------- providers ---------- */
+.lab-providers {
+  padding: 1.2rem 1.4rem;
+}
+
+.lab-providers h2,
+.lab-section h2 {
+  font-size: 1.25rem;
+  color: #fff;
+  margin-bottom: 0.9rem;
+}
+
+.lab-providers ul {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+}
+
+.lab-provider {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  background: rgba(5, 5, 10, 0.5);
+  border: 1px solid rgba(139, 92, 246, 0.16);
+  border-radius: var(--radius-sm);
+}
+
+.lab-provider div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lab-provider strong {
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.lab-provider span {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.lab-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 0.38rem;
+  border-radius: 50%;
+  background: #52525b;
+}
+
+.lab-provider.on .lab-dot {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+}
+
+.lab-provider.off {
+  opacity: 0.7;
+}
+
+.lab-threshold {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.lab-threshold strong {
+  color: #c4b5fd;
+}
+
+.lab-error {
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
+/* ---------- sections ---------- */
+.lab-sub {
+  margin: -0.4rem 0 1rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* 5 steps: three across, then two wider cards, so every row is full */
+.lab-pipeline {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1rem;
+}
+
+.lab-pipeline li {
+  grid-column: span 2;
+  padding: 1.2rem 1.3rem;
+}
+
+.lab-pipeline li:nth-child(n + 4) {
+  grid-column: span 3;
+}
+
+@media (max-width: 860px) {
+  .lab-pipeline {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .lab-pipeline li,
+  .lab-pipeline li:nth-child(n + 4) {
+    grid-column: auto;
+  }
+
+  .lab-pipeline li:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.lab-pipeline h3 {
+  font-size: 1rem;
+  color: #c4b5fd;
+  margin-bottom: 0.4rem;
+}
+
+.lab-pipeline p {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.lab-langs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.lab-lang {
+  padding: 1.1rem 1.2rem;
+}
+
+.lab-lang header {
+  margin-bottom: 0.8rem;
+}
+
+.lab-lang h3 {
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+.lab-lang header span {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.lab-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.lab-example {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-align: left;
+  color: var(--text);
+  background: rgba(5, 5, 10, 0.55);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.lab-example i {
+  font-style: normal;
+  flex-shrink: 0;
+}
+
+.lab-example.good i {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.lab-example:hover {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: var(--accent);
+}
+
+.lab-limits {
+  padding: 1.3rem 1.5rem;
+}
+
+.lab-limits h2 {
+  margin-bottom: 0.5rem;
+}
+
+.lab-limits p {
+  color: var(--text-dim);
+  font-size: 0.93rem;
+  margin-bottom: 1rem;
+  max-width: 760px;
+}
+
+@media (max-width: 560px) {
+  .lab {
+    gap: 1.5rem;
+  }
+
+  .lab-pipeline {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-pipeline li:last-child {
+    grid-column: auto;
+  }
+}

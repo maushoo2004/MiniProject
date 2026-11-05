@@ -280,3 +280,74 @@
     opacity: 0.6;
   }
 }
+/* ---- v2 additions ---- */
+.comment-form-meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.char-count {
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+.blocked-message {
+  color: #fca5a5;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.review-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.severity-pill,
+.score-pill,
+.category-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  color: #fff;
+  text-transform: capitalize;
+}
+
+.score-pill {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.matched-terms,
+.detected-by {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  margin: 0.2rem 0;
+}
+
+.suggestion-label {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.support-box {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0;
+  color: #c7d2fe;
+  position: relative;
+}
+
+.support-box p {
+  flex: 1;
+  font-size: 0.9rem;
+}

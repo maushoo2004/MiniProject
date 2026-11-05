@@ -1,365 +1,201 @@
 import React, { useState } from "react";
-import {
-  moderateContentEnhanced,
-  getAISuggestion,
-} from "../services/enhancedModerationService";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import {
+  getCategoryDisplayName,
+  getCategoryColor,
+  getSeverityColor,
+  formatScore,
+  getSourceLabel,
+} from "../utils/moderationLabels";
+import LiveMeter from "./LiveMeter";
 import "./CommentForm.css";
 
-const CommentForm = ({ postId, onAddComment, showToast, user }) => {
-  const { isBlocked, userReportCount } = useAuth();
+const MAX_LENGTH = 2000;
+
+const CommentForm = ({ postId, onCommentPosted, showToast }) => {
+  const { isBlocked, userReportCount, blockThreshold, refreshProfile } = useAuth();
   const [content, setContent] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
-  const [showSuggestion, setShowSuggestion] = useState(false);
-  const [isCheckingModeration, setIsCheckingModeration] = useState(false);
-  const [moderationResult, setModerationResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [review, setReview] = useState(null); // { moderation, suggestion } when flagged
+  const [supportMessage, setSupportMessage] = useState(null);
 
-  // Reset suggestion when content changes
-  const handleContentChange = (e) => {
-    const newContent = e.target.value;
-    setContent(newContent);
-
-    // Reset moderation state when content changes
-    if (showSuggestion) {
-      setShowSuggestion(false);
-      setAiSuggestion(null);
-      setModerationResult(null);
-    }
+  const reset = () => {
+    setContent("");
+    setReview(null);
   };
 
-  // Use the suggested rephrasing
-  const handleUseSuggestion = async () => {
-    if (aiSuggestion) {
-      setContent(aiSuggestion);
-      setShowSuggestion(false);
-      setAiSuggestion(null);
-      setModerationResult(null);
-      showToast("Suggestion applied. Please review and submit.", "info");
-    }
-  };
-
-  // Dismiss suggestion and keep original comment
-  const handleDismissSuggestion = () => {
-    setShowSuggestion(false);
-    setAiSuggestion(null);
-    setModerationResult(null);
-  };
-
-  // Post the original comment anyway (after seeing warning)
-  // This now automatically reports the user and blocks the comment from the author
-  const handlePostAnyway = async () => {
-    if (!moderationResult || !content.trim() || !user) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setShowSuggestion(false);
-
+  const submit = async (text, acknowledgeWarning = false) => {
+    setBusy(true);
     try {
-      // Automatically report the user for posting toxic content
-      console.log(
-        "⚠️ User is posting toxic content anyway - auto-reporting..."
-      );
+      const res = await api("/api/comments", {
+        method: "POST",
+        body: { postId, content: text, acknowledgeWarning },
+      });
 
-      // First, create the comment in the database (marked as flagged)
-      const commentData = {
-        content: content,
-        isFlagged: true,
-        toxicityScore: moderationResult.score || null,
-        severity: moderationResult.severity || "high",
-        categories: moderationResult.categories || [],
-        source: moderationResult.source || "keyword",
-      };
+      if (res.supportMessage) setSupportMessage(res.supportMessage);
 
-      // Post the comment (flagged, so hidden from public but visible to post author)
-      const postedComment = await onAddComment(commentData);
-      console.log("💬 Toxic comment posted (flagged):", postedComment);
-
-      // Create report in the reports table with the comment ID
-      const { error: reportError } = await supabase.from("reports").insert([
-        {
-          reported_user_id: user.id,
-          reporter_id: user.id, // Self-report by system
-          comment_id: postedComment?.id || null,
-          post_id: postId,
-          reason: "Posted toxic content after moderation warning",
-          created_at: new Date().toISOString(),
-        },
-      ]);
-
-      if (reportError && reportError.code !== "23505") {
-        console.error("Error creating auto-report:", reportError);
-      }
-
-      // Increment report count
-      try {
-        const { error: rpcError } = await supabase.rpc(
-          "increment_user_report_count",
-          { target_user_id: user.id }
-        );
-
-        if (rpcError) {
-          // Fallback to direct update
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("report_count")
-            .eq("id", user.id)
-            .single();
-
-          const currentCount = profile?.report_count || 0;
-          await supabase
-            .from("profiles")
-            .update({ report_count: currentCount + 1 })
-            .eq("id", user.id);
-        }
-      } catch (error) {
-        console.error("Error incrementing report count:", error);
-      }
-
-      // Show severe warning with longer duration (15 seconds)
-      showToast(
-        `⚠️ WARNING: Your comment has been BLOCKED and your account has been reported for posting inappropriate content after being warned. Continued violations will result in permanent suspension. Current toxicity score: ${(
-          moderationResult.score * 100
-        ).toFixed(1)}%`,
-        "error",
-        15000 // 15 seconds duration
-      );
-
-      // Reset form
-      setContent("");
-      setAiSuggestion(null);
-      setShowSuggestion(false);
-      setModerationResult(null);
-
-      // Refresh auth context to update report count after toast is shown
-      if (window.location) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 16000); // Reload after 16 seconds (after the 15-second toast)
-      }
-    } catch (error) {
-      console.error("Error handling toxic comment:", error);
-      showToast("Error processing your request. Please try again.", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!content.trim()) {
-      showToast("Please enter a comment", "error");
-      return;
-    }
-
-    if (!user) {
-      showToast("Please login to comment", "error");
-      return;
-    }
-
-    // If already showing suggestion/warning, don't check again
-    if (showSuggestion) {
-      return;
-    }
-
-    setIsCheckingModeration(true);
-
-    try {
-      console.log("🔍 Checking content for moderation:", content);
-
-      // First, check moderation
-      const modResult = await moderateContentEnhanced(content);
-      setModerationResult(modResult);
-
-      console.log("📊 Moderation result:", modResult);
-
-      // If content is toxic, get AI suggestion and show warning
-      if (modResult.isToxic) {
-        console.log("⚠️ Content is toxic, getting AI suggestion...");
-
-        try {
-          const suggestion = await getAISuggestion(content);
-          if (suggestion && suggestion.trim().length > 0) {
-            setAiSuggestion(suggestion);
-            setShowSuggestion(true);
-            console.log("💡 Showing suggestion to user");
-            showToast(
-              "Please review the suggestion or choose to post anyway",
-              "warning"
-            );
-            return; // Stop here - don't submit yet
-          }
-        } catch (error) {
-          console.warn("Could not get AI suggestion:", error);
-        }
-
-        // If no suggestion available, still show warning
-        setShowSuggestion(true);
+      if (res.moderation.isToxic) {
         showToast(
-          "Your comment may be inappropriate. Review or post anyway.",
-          "warning"
+          res.blocked
+            ? `Your comment was hidden and reported. You now have ${res.reportCount} reports and can no longer comment.`
+            : `Your comment was hidden from others and your account was reported (${res.reportCount}/${blockThreshold}). Repeated violations will block commenting.`,
+          "error",
+          9000
         );
-        return; // Stop here - don't submit yet
+      } else {
+        showToast("Comment posted!", "success");
       }
-
-      // Content is clean, proceed with submission
-      console.log("✅ Content is clean, submitting...");
-
-      const commentData = {
-        content: content,
-        isFlagged: false,
-        toxicityScore: modResult.score || null,
-        severity: null,
-        categories: [],
-        source: modResult.source || "keyword",
-      };
-
-      await onAddComment(commentData);
-      showToast("Comment posted successfully!", "success");
-
-      // Reset form
-      setContent("");
-      setModerationResult(null);
-    } catch (error) {
-      console.error("Error submitting comment:", error);
-      showToast("Error posting comment. Please try again.", "error");
+      reset();
+      onCommentPosted?.();
+    } catch (err) {
+      if (err.status === 422 && err.data?.code === "needs_review") {
+        setReview({ moderation: err.data.moderation, suggestion: err.data.suggestion });
+      } else if (err.status === 403 && err.data?.code === "blocked") {
+        showToast(err.message, "error", 6000);
+        refreshProfile();
+      } else {
+        showToast(err.message, "error", 6000);
+      }
     } finally {
-      setIsCheckingModeration(false);
+      setBusy(false);
     }
   };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!content.trim()) return showToast("Please write something first", "error");
+    if (review) return;
+    submit(content.trim());
+  };
+
+  const useSuggestion = () => {
+    setContent(review.suggestion.text);
+    setReview(null);
+    showToast("Suggestion applied — review it and post when ready.", "info");
+  };
+
+  const m = review?.moderation;
 
   return (
     <form className="comment-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label htmlFor="content">Your Comment</label>
+        <label htmlFor="comment-content">Your Comment</label>
         <textarea
-          id="content"
+          id="comment-content"
           value={content}
-          onChange={handleContentChange}
+          onChange={(e) => {
+            setContent(e.target.value);
+            if (review) setReview(null);
+          }}
           placeholder={
             isBlocked
               ? "You are blocked from commenting due to multiple reports."
-              : "Share your thoughts... (Supports Hindi and English)"
+              : "Share your thoughts... (English, Hindi, Hinglish, Kannada)"
           }
           rows="4"
-          disabled={isSubmitting || isBlocked}
+          maxLength={MAX_LENGTH}
+          disabled={busy || isBlocked}
         />
+        <div className="comment-form-meta">
+          <span className="char-count">
+            {content.length}/{MAX_LENGTH}
+          </span>
+        </div>
+        <LiveMeter text={content} disabled={busy || isBlocked || Boolean(review)} />
         {isBlocked && (
-          <p
-            className="blocked-message"
-            style={{ color: "#fca5a5", marginTop: "8px", fontWeight: "600" }}
-          >
-            ⚠️ You cannot comment because your account has been reported{" "}
-            {userReportCount} times (limit: 3).
+          <p className="blocked-message">
+            ⚠️ You can't comment because your account has been reported {userReportCount} times
+            (limit: {blockThreshold}). Contact an admin if you think this is a mistake.
           </p>
         )}
       </div>
 
-      {/* AI Suggestion Box - Appears below comment box */}
-      {showSuggestion && (
+      {supportMessage && (
+        <div className="support-box" role="status">
+          <span>💙</span>
+          <p>{supportMessage}</p>
+          <button type="button" className="suggestion-close" onClick={() => setSupportMessage(null)}>
+            ×
+          </button>
+        </div>
+      )}
+
+      {review && (
         <div className="ai-suggestion-box">
           <div className="suggestion-header">
             <span className="suggestion-icon">⚠️</span>
-            <strong>Content Warning</strong>
+            <strong>ToxiFilter flagged this comment</strong>
             <button
               className="suggestion-close"
-              onClick={handleDismissSuggestion}
-              aria-label="Close suggestion"
+              onClick={() => setReview(null)}
+              aria-label="Close"
               type="button"
             >
               ×
             </button>
           </div>
-          {aiSuggestion ? (
+
+          <div className="review-details">
+            <span className="severity-pill" style={{ backgroundColor: getSeverityColor(m.severity) }}>
+              {m.severity} severity
+            </span>
+            <span className="score-pill">Toxicity {formatScore(m.score)}</span>
+            {m.categories
+              .filter((c) => c !== "self_harm")
+              .map((c) => (
+                <span key={c} className="category-pill" style={{ backgroundColor: getCategoryColor(c) }}>
+                  {getCategoryDisplayName(c)}
+                </span>
+              ))}
+          </div>
+          {m.matchedTerms?.length > 0 && (
+            <p className="matched-terms">
+              Problem words: {m.matchedTerms.map((t) => `“${t}”`).join(", ")}
+            </p>
+          )}
+          <p className="detected-by">Detected by: {getSourceLabel(m.source)}</p>
+
+          {review.suggestion?.text && (
             <>
-              <p className="suggestion-text">{aiSuggestion}</p>
-              <div className="suggestion-actions">
-                <button
-                  type="button"
-                  className="use-suggestion-btn"
-                  onClick={handleUseSuggestion}
-                  disabled={isSubmitting}
-                >
-                  Use This Suggestion
-                </button>
-                <button
-                  type="button"
-                  className="post-anyway-btn"
-                  onClick={handlePostAnyway}
-                  disabled={isSubmitting}
-                >
-                  Post Original Anyway
-                </button>
-                <button
-                  type="button"
-                  className="dismiss-suggestion-btn"
-                  onClick={handleDismissSuggestion}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-              </div>
-              <p className="suggestion-note">
-                ⚠️ <strong>WARNING:</strong> Your comment was flagged as
-                inappropriate. If you post it anyway, your account will be{" "}
-                <strong>automatically reported</strong> and the comment will be{" "}
-                <strong>BLOCKED from the author</strong>. Use the polite
-                suggestion to avoid penalties.
+              <p className="suggestion-label">
+                {review.suggestion.source === "groq" ? "✨ AI-suggested rewrite:" : "💡 Suggested rewrite:"}
               </p>
-            </>
-          ) : (
-            <>
-              <p className="suggestion-text">
-                Your comment may contain inappropriate content. Please review
-                your comment before posting.
-              </p>
-              <div className="suggestion-actions">
-                <button
-                  type="button"
-                  className="post-anyway-btn"
-                  onClick={handlePostAnyway}
-                  disabled={isSubmitting}
-                >
-                  Post Anyway
-                </button>
-                <button
-                  type="button"
-                  className="dismiss-suggestion-btn"
-                  onClick={handleDismissSuggestion}
-                  disabled={isSubmitting}
-                >
-                  Cancel & Edit
-                </button>
-              </div>
-              <p className="suggestion-note">
-                ⚠️ <strong>SEVERE WARNING:</strong> Posting this comment will
-                result in <strong>automatic account reporting</strong> and the
-                comment will be <strong>BLOCKED</strong>. Your account may be
-                suspended after multiple violations. Please edit your comment.
-              </p>
+              <p className="suggestion-text">{review.suggestion.text}</p>
             </>
           )}
+
+          <div className="suggestion-actions">
+            {review.suggestion?.text && (
+              <button type="button" className="use-suggestion-btn" onClick={useSuggestion} disabled={busy}>
+                Use This Suggestion
+              </button>
+            )}
+            <button type="button" className="dismiss-suggestion-btn" onClick={() => setReview(null)} disabled={busy}>
+              Edit My Comment
+            </button>
+            <button
+              type="button"
+              className="post-anyway-btn"
+              onClick={() => submit(content.trim(), true)}
+              disabled={busy}
+            >
+              Post Original Anyway
+            </button>
+          </div>
+          <p className="suggestion-note">
+            ⚠️ If you post the original, it will be <strong>hidden from other readers</strong> and your
+            account will be <strong>automatically reported</strong> ({userReportCount}/{blockThreshold} so
+            far). At {blockThreshold} reports you can no longer comment.
+          </p>
         </div>
       )}
 
       <div className="form-actions-wrapper">
-        <button
-          type="submit"
-          className="submit-button"
-          disabled={isSubmitting || isCheckingModeration || isBlocked}
-        >
-          {isSubmitting
-            ? "Posting..."
-            : isCheckingModeration
-            ? "Checking..."
-            : "Post Comment"}
+        <button type="submit" className="submit-button" disabled={busy || isBlocked || Boolean(review)}>
+          {busy ? "Checking..." : "Post Comment"}
         </button>
-        {isCheckingModeration && (
-          <span className="checking-indicator">🔍 Checking content...</span>
-        )}
+        {busy && <span className="checking-indicator">🛡️ ToxiFilter is checking your comment...</span>}
       </div>
     </form>
   );

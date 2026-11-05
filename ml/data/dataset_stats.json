@@ -1,0 +1,53 @@
+{
+  "sources": {
+    "offenseval_dravidian (kannada)": {
+      "raw_rows": 6994,
+      "dropped_not_kannada": 1713
+    },
+    "tdavidson/hate_speech_offensive": {
+      "raw_rows": 24783
+    },
+    "HASOC 2021 task 2 (nikitadesai/hasoc)": {
+      "raw_rows": 4914,
+      "dropped_context_dependent_CHOF": 888
+    }
+  },
+  "dropped_empty_or_too_short": 80,
+  "dropped_conflicting_labels": 181,
+  "dropped_duplicates": 909,
+  "removed_because_in_independent_test_set": 0,
+  "before_english_cap": {
+    "en": 26524,
+    "kannada": 4993,
+    "hi": 783,
+    "hinglish": 620
+  },
+  "final_rows": 10660,
+  "final_by_language": {
+    "en": {
+      "rows": 4264,
+      "toxic": 2132,
+      "clean": 2132,
+      "share": 0.4
+    },
+    "hi": {
+      "rows": 783,
+      "toxic": 351,
+      "clean": 432,
+      "share": 0.073
+    },
+    "hinglish": {
+      "rows": 620,
+      "toxic": 396,
+      "clean": 224,
+      "share": 0.058
+    },
+    "kannada": {
+      "rows": 4993,
+      "toxic": 1293,
+      "clean": 3700,
+      "share": 0.468
+    }
+  },
+  "final_toxic_share": 0.391
+}

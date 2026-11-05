@@ -35,11 +35,14 @@ const Auth = ({ onClose }) => {
         setLoading(false);
         return;
       }
-      const { error } = await signUp(email, password, name);
+      const { data, error } = await signUp(email, password, name);
       if (error) {
         setError(error.message);
+      } else if (data?.session) {
+        setMessage('Account created! You are now logged in.');
+        setTimeout(() => onClose(), 1000);
       } else {
-        setMessage('Account created! Please check your email to verify your account.');
+        setMessage('Account created! Please check your email to verify your account, then log in.');
       }
     }
 

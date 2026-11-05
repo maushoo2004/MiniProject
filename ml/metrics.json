@@ -1,0 +1,350 @@
+{
+  "trained_at": "2026-11-04T20:15:00+00:00",
+  "model": "Logistic Regression: TF-IDF char_wb 2-5 + word 1-2 (class_weight=balanced)",
+  "selected_model": "logreg",
+  "threshold": 0.7,
+  "data_files": [
+    "combined.csv"
+  ],
+  "n_samples": 10660,
+  "n_train": 8528,
+  "n_test": 2132,
+  "by_language": {
+    "en": {
+      "rows": 4264,
+      "toxic": 2132
+    },
+    "hi": {
+      "rows": 783,
+      "toxic": 351
+    },
+    "hinglish": {
+      "rows": 620,
+      "toxic": 396
+    },
+    "kannada": {
+      "rows": 4993,
+      "toxic": 1293
+    }
+  },
+  "deployed_model_refit_on_all_data": true,
+  "selection_rule": "highest held-out F1 among (model, threshold) options with <= 1 false alarm(s) on the clean rows of the independent test set; options within 0.005 F1 of the best are tied and resolved in favour of logistic regression, then the higher threshold",
+  "candidates": [
+    {
+      "model": "logreg",
+      "threshold": 0.5,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.8377,
+        "precision": 0.8058,
+        "recall": 0.771,
+        "f1": 0.788,
+        "tp": 643,
+        "fp": 155,
+        "fn": 191,
+        "tn": 1143
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7656,
+        "precision": 0.8519,
+        "recall": 0.6765,
+        "f1": 0.7541,
+        "tp": 23,
+        "fp": 4,
+        "fn": 11,
+        "tn": 26,
+        "clean_rows": 30,
+        "false_alarms": 4
+      }
+    },
+    {
+      "model": "logreg",
+      "threshold": 0.6,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.8419,
+        "precision": 0.8545,
+        "recall": 0.7182,
+        "f1": 0.7805,
+        "tp": 599,
+        "fp": 102,
+        "fn": 235,
+        "tn": 1196
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7656,
+        "precision": 0.913,
+        "recall": 0.6176,
+        "f1": 0.7368,
+        "tp": 21,
+        "fp": 2,
+        "fn": 13,
+        "tn": 28,
+        "clean_rows": 30,
+        "false_alarms": 2
+      }
+    },
+    {
+      "model": "logreg",
+      "threshold": 0.7,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.8391,
+        "precision": 0.8903,
+        "recall": 0.6715,
+        "f1": 0.7656,
+        "tp": 560,
+        "fp": 69,
+        "fn": 274,
+        "tn": 1229
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7812,
+        "precision": 1.0,
+        "recall": 0.5882,
+        "f1": 0.7407,
+        "tp": 20,
+        "fp": 0,
+        "fn": 14,
+        "tn": 30,
+        "clean_rows": 30,
+        "false_alarms": 0
+      }
+    },
+    {
+      "model": "svc",
+      "threshold": 0.5,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.849,
+        "precision": 0.8441,
+        "recall": 0.753,
+        "f1": 0.7959,
+        "tp": 628,
+        "fp": 116,
+        "fn": 206,
+        "tn": 1182
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7812,
+        "precision": 0.9167,
+        "recall": 0.6471,
+        "f1": 0.7586,
+        "tp": 22,
+        "fp": 2,
+        "fn": 12,
+        "tn": 28,
+        "clean_rows": 30,
+        "false_alarms": 2
+      }
+    },
+    {
+      "model": "svc",
+      "threshold": 0.6,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.8401,
+        "precision": 0.887,
+        "recall": 0.6775,
+        "f1": 0.7682,
+        "tp": 565,
+        "fp": 72,
+        "fn": 269,
+        "tn": 1226
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7656,
+        "precision": 1.0,
+        "recall": 0.5588,
+        "f1": 0.717,
+        "tp": 19,
+        "fp": 0,
+        "fn": 15,
+        "tn": 30,
+        "clean_rows": 30,
+        "false_alarms": 0
+      }
+    },
+    {
+      "model": "svc",
+      "threshold": 0.7,
+      "test": {
+        "n": 2132,
+        "accuracy": 0.8255,
+        "precision": 0.9215,
+        "recall": 0.6055,
+        "f1": 0.7308,
+        "tp": 505,
+        "fp": 43,
+        "fn": 329,
+        "tn": 1255
+      },
+      "independent": {
+        "n": 64,
+        "accuracy": 0.7188,
+        "precision": 1.0,
+        "recall": 0.4706,
+        "f1": 0.64,
+        "tp": 16,
+        "fp": 0,
+        "fn": 18,
+        "tn": 30,
+        "clean_rows": 30,
+        "false_alarms": 0
+      }
+    }
+  ],
+  "test": {
+    "n": 2132,
+    "accuracy": 0.8391,
+    "precision": 0.8903,
+    "recall": 0.6715,
+    "f1": 0.7656,
+    "tp": 560,
+    "fp": 69,
+    "fn": 274,
+    "tn": 1229,
+    "confusion_matrix": {
+      "labels": [
+        "clean",
+        "toxic"
+      ],
+      "matrix": [
+        [
+          1229,
+          69
+        ],
+        [
+          274,
+          560
+        ]
+      ]
+    },
+    "note": "scored on a split the evaluated model never saw"
+  },
+  "per_language_test": {
+    "en": {
+      "n": 852,
+      "accuracy": 0.9202,
+      "precision": 0.9711,
+      "recall": 0.8662,
+      "f1": 0.9156,
+      "tp": 369,
+      "fp": 11,
+      "fn": 57,
+      "tn": 415
+    },
+    "hinglish": {
+      "n": 124,
+      "accuracy": 0.6371,
+      "precision": 0.7656,
+      "recall": 0.6203,
+      "f1": 0.6853,
+      "tp": 49,
+      "fp": 15,
+      "fn": 30,
+      "tn": 30
+    },
+    "kannada": {
+      "n": 999,
+      "accuracy": 0.8278,
+      "precision": 0.8042,
+      "recall": 0.444,
+      "f1": 0.5721,
+      "tp": 115,
+      "fp": 28,
+      "fn": 144,
+      "tn": 712
+    },
+    "hi": {
+      "n": 157,
+      "accuracy": 0.6306,
+      "precision": 0.6429,
+      "recall": 0.3857,
+      "f1": 0.4821,
+      "tp": 27,
+      "fp": 15,
+      "fn": 43,
+      "tn": 72
+    }
+  },
+  "independent_set": {
+    "file": "dataset.json",
+    "n": 64,
+    "accuracy": 0.7812,
+    "precision": 1.0,
+    "recall": 0.5882,
+    "f1": 0.7407,
+    "tp": 20,
+    "fp": 0,
+    "fn": 14,
+    "tn": 30,
+    "clean_rows": 30,
+    "false_alarms": 0,
+    "per_language": {
+      "en": {
+        "n": 42,
+        "accuracy": 0.8333,
+        "precision": 1.0,
+        "recall": 0.65,
+        "f1": 0.7879,
+        "tp": 13,
+        "fp": 0,
+        "fn": 7,
+        "tn": 22
+      },
+      "hinglish": {
+        "n": 12,
+        "accuracy": 0.8333,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571,
+        "tp": 6,
+        "fp": 0,
+        "fn": 2,
+        "tn": 4
+      },
+      "kannada": {
+        "n": 4,
+        "accuracy": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 2,
+        "tn": 2
+      },
+      "hi": {
+        "n": 6,
+        "accuracy": 0.5,
+        "precision": 1.0,
+        "recall": 0.25,
+        "f1": 0.4,
+        "tp": 1,
+        "fp": 0,
+        "fn": 3,
+        "tn": 2
+      }
+    },
+    "note": "never trained on; but its CLEAN rows were used as a false-alarm guard when choosing the threshold"
+  },
+  "cross_validation": {
+    "logreg": {
+      "folds": 5,
+      "f1_mean": 0.7847,
+      "f1_std": 0.0127
+    },
+    "svc": {
+      "folds": 5,
+      "f1_mean": 0.7847,
+      "f1_std": 0.0149
+    }
+  },
+  "tiny_dataset_warning": false
+}

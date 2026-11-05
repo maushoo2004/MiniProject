@@ -1093,3 +1093,57 @@
         height: 180px;
     }
 }
+/* ---- v2 additions: horizontal bar charts ---- */
+.hbar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.hbar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 40px;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hbar-label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.hbar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+}
+
+.hbar-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+  transition: width 0.6s ease;
+}
+
+.hbar-value {
+  font-weight: 700;
+  color: #f1f5f9;
+  text-align: right;
+}
+
+.flagged-comment-card .report-button {
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.flagged-comment-card .reported-tag {
+  color: #86efac;
+  font-size: 0.9rem;
+}

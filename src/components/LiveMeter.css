@@ -1,0 +1,51 @@
+.live-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+  --meter-color: #10b981;
+}
+
+.live-meter.mid {
+  --meter-color: #f59e0b;
+}
+
+.live-meter.high {
+  --meter-color: #ef4444;
+}
+
+.live-meter-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.live-meter-fill {
+  height: 100%;
+  background: var(--meter-color);
+  border-radius: 999px;
+  box-shadow: 0 0 8px var(--meter-color);
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.live-meter-label {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--meter-color);
+}
+
+@media (max-width: 480px) {
+  .live-meter {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .live-meter-track {
+    width: 100%;
+    flex: none;
+  }
+}
